@@ -107,9 +107,8 @@ App.util = (function () {
     return Math.random().toString(36).slice(2, 10)
   }
 
-  /** Trigger a client-side download of `obj` as a pretty-printed JSON file. */
-  function downloadJSON(filename, obj) {
-    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' })
+  function download(filename, text, mime) {
+    const blob = new Blob([text], { type: mime || 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = el('a', { href: url, download: filename })
     document.body.appendChild(a)
@@ -118,11 +117,29 @@ App.util = (function () {
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
+  /** Trigger a client-side download of `obj` as a pretty-printed JSON file. */
+  function downloadJSON(filename, obj) {
+    download(filename, JSON.stringify(obj, null, 2), 'application/json')
+  }
+
+  /** Build a CSV string from an array of rows (each row an array of cells). */
+  function toCSV(rows) {
+    const esc = (v) => {
+      const s = v == null ? '' : String(v)
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+    }
+    return rows.map((r) => r.map(esc).join(',')).join('\r\n')
+  }
+
+  function downloadCSV(filename, rows) {
+    download(filename, toCSV(rows), 'text/csv;charset=utf-8')
+  }
+
   return {
     $, $$, el, clear, escapeHtml,
     money, moneyCompact, round2, setCurrency, getCurrency,
     parseISO, toISO, todayISO, startOfMonth, endOfMonth, addMonths,
     monthKey, sameMonth, monthLabel, prettyDate, shortDate,
-    uid, inviteCode, downloadJSON,
+    uid, inviteCode, download, downloadJSON, toCSV, downloadCSV,
   }
 })()

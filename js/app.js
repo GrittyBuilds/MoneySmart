@@ -11,11 +11,14 @@ const NAV = [
   { path: '/', label: 'Dashboard', icon: 'dashboard' },
   { path: '/transactions', label: 'Transactions', icon: 'tx' },
   { path: '/budgets', label: 'Budgets', icon: 'budget' },
+  { path: '/reports', label: 'Reports', icon: 'report' },
   { path: '/accounts', label: 'Accounts', icon: 'wallet' },
   { path: '/family', label: 'Family', icon: 'users' },
   { path: '/settings', label: 'Settings', icon: 'settings' },
 ]
-const BOTTOM = NAV.slice(0, 5) // Dashboard..Family; Settings via gear/sidebar
+// Mobile bottom bar shows the five core destinations; Family + Settings live
+// in the mobile top bar and the desktop sidebar.
+const BOTTOM = NAV.slice(0, 5)
 
 const root = () => App.util.$('#app')
 
@@ -85,6 +88,7 @@ App.refresh = async function () {
 App.router.register('/', App.pages.dashboard)
 App.router.register('/transactions', App.pages.transactions)
 App.router.register('/budgets', App.pages.budgets)
+App.router.register('/reports', App.pages.reports)
 App.router.register('/accounts', App.pages.accounts)
 App.router.register('/family', App.pages.family)
 App.router.register('/settings', App.pages.settings)
@@ -246,6 +250,7 @@ function renderShell() {
 
   const topbarRight = el('div', { style: { display: 'flex', gap: '4px' } }, [
     themeIconButton(),
+    el('a', { href: '#/family', class: 'icon-btn', 'aria-label': 'Family' }, [App.ui.icon('users', 20)]),
     el('a', { href: '#/settings', class: 'icon-btn', 'aria-label': 'Settings' }, [App.ui.icon('settings', 20)]),
     App.state.mode === 'cloud'
       ? el('button', { class: 'icon-btn', 'aria-label': 'Sign out', onClick: async () => { await App.CloudBackend.signOut(); await App.boot() } }, [App.ui.icon('logout', 20)])

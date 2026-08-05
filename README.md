@@ -16,6 +16,16 @@ devices and share one budget with your family.
   spending-by-category donut, a 6-month income-vs-expense bar chart, and recent
   activity. Charts are hand-drawn SVG — no chart library.
 - **💸 Transactions** — add, edit, delete, search, and filter income & expenses.
+  Each has a **description** and a **vendor** line (with autocomplete from past
+  vendors).
+- **✂️ Split transactions** — split one transaction's amount across multiple
+  categories/subcategories; the editor keeps a running total and only saves when
+  the splits add up. Splits flow through the dashboard, budgets, and reports.
+- **🔖 Tags** — create colored tags and attach several to any transaction, then
+  filter and report on them.
+- **📈 Reports** — slice spending or income by **category, subcategory, tag,
+  vendor, account, or month** over any date range, see a ranked breakdown, and
+  **export to CSV** (summary or full transactions).
 - **🏷️ Categories & subcategories** — add and remove your own categories, and
   nest subcategories under them. Deleting a category also removes its
   subcategories. The dashboard donut rolls spending up to the top-level
@@ -98,10 +108,13 @@ js/
 ├── router.js           # tiny hash router
 ├── app.js              # bootstrap: backend choice, auth, shell, nav
 └── pages/
-    ├── dashboard.js  transactions.js  budgets.js
+    ├── dashboard.js  transactions.js  budgets.js  reports.js
     ├── accounts.js   family.js        settings.js
 supabase/
 └── schema.sql          # tables + RLS + create/join household RPCs
+
+# Using cloud sync? Re-run supabase/schema.sql after updating — it adds the
+# tags table and the vendor / tag_ids / splits columns via idempotent migrations.
 ```
 
 ## How family sharing works (cloud mode)

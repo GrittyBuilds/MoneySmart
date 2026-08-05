@@ -267,6 +267,27 @@ input[type=number] { -moz-appearance: textfield; }
 .cat-child { display: flex; align-items: center; gap: 8px; padding: 8px 11px 8px 16px; border-top: 1px solid var(--border); font-size: 0.9rem; }
 .cat-branch { color: var(--faint); font-size: 0.9rem; }
 
+/* ---- Split editor (transaction form) ---- */
+.field-head { display: flex; justify-content: space-between; align-items: center; }
+.split-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.split-toggle input { accent-color: var(--brand); }
+.split-editor { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; background: var(--bg-2); }
+.split-list { display: flex; flex-direction: column; gap: 8px; }
+.split-row { display: grid; grid-template-columns: 1fr 8.5rem auto; gap: 6px; align-items: center; }
+.split-row .split-amt { width: 8.5rem; }
+.split-row .money-input { font-size: 0.9rem; font-weight: 500; }
+.split-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.split-total { font-size: 12px; }
+.split-total .ok { color: var(--brand-text); font-weight: 600; }
+.split-total .off { color: var(--warn); font-weight: 600; }
+
+/* ---- Tag chips ---- */
+.tag-chip { cursor: pointer; transition: border-color .12s, background .12s; }
+.tag-chip.sel { border-color: var(--brand); background: var(--brand-soft); color: var(--text); }
+.tag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+.tag-mini { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); background: var(--surface-2); border-radius: 99px; padding: 2px 8px; }
+.tag-mini .dot { width: 7px; height: 7px; border-radius: 50%; }
+
 /* Nav-item-styled footer buttons (sidebar) */
 .nav-btn {
   display: flex; align-items: center; gap: 12px; width: 100%;
@@ -286,6 +307,20 @@ input[type=number] { -moz-appearance: textfield; }
 .month-picker button:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
 .month-picker button:disabled { opacity: .3; }
 .month-picker .m-label { min-width: 118px; text-align: center; font-weight: 600; font-size: 0.86rem; }
+
+/* ---- Reports ---- */
+.report-filters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: end; }
+.report-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.report-list { display: flex; flex-direction: column; gap: 14px; }
+.report-row { display: flex; flex-direction: column; gap: 5px; }
+.report-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.report-label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.report-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+.report-bar { height: 8px; border-radius: 99px; background: var(--track); overflow: hidden; }
+.report-fill { display: block; height: 100%; border-radius: 99px; transition: width .3s; }
+.report-sub { font-size: 12px; color: var(--faint); }
+@media (max-width: 620px) { .report-filters { grid-template-columns: 1fr; } }
 
 /* ---- Charts ---- */
 .chart { width: 100%; height: auto; display: block; }

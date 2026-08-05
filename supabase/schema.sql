@@ -60,6 +60,16 @@ create table if not exists public.categories (
 alter table public.categories
   add column if not exists parent_id uuid references public.categories (id) on delete cascade;
 
+-- Tags: freeform labels that can be attached to any transaction.
+create table if not exists public.tags (
+  id           uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households (id) on delete cascade,
+  name         text not null,
+  color        text not null default '#64748b',
+  created_at   timestamptz not null default now(),
+  unique (household_id, name)
+);
+
 -- Individual money movements.
 create table if not exists public.transactions (
   id           uuid primary key default gen_random_uuid(),
@@ -69,10 +79,22 @@ create table if not exists public.transactions (
   kind         text not null default 'expense',   -- expense | income
   amount       numeric(14,2) not null check (amount >= 0),
   description  text,
+  vendor       text,
+  -- Tag ids attached to this transaction (ids reference public.tags).
+  tag_ids      uuid[] not null default '{}',
+  -- Optional split allocation: [{ "category_id": uuid|null, "amount": number }].
+  -- When present, it overrides category_id for reporting. Empty/null = single
+  -- category via category_id.
+  splits       jsonb not null default '[]',
   occurred_on  date not null default current_date,
   created_by   uuid not null default auth.uid() references auth.users (id),
   created_at   timestamptz not null default now()
 );
+
+-- Migrations for projects created before vendor / tags / splits existed.
+alter table public.transactions add column if not exists vendor  text;
+alter table public.transactions add column if not exists tag_ids uuid[] not null default '{}';
+alter table public.transactions add column if not exists splits  jsonb  not null default '[]';
 
 -- A monthly spending limit for a category. `month` is the first day of the month.
 create table if not exists public.budgets (
@@ -90,6 +112,7 @@ create index if not exists idx_members_user       on public.household_members (u
 create index if not exists idx_members_household   on public.household_members (household_id);
 create index if not exists idx_accounts_household  on public.accounts (household_id);
 create index if not exists idx_categories_house    on public.categories (household_id);
+create index if not exists idx_tags_house          on public.tags (household_id);
 create index if not exists idx_tx_household_date   on public.transactions (household_id, occurred_on);
 create index if not exists idx_budgets_house_month on public.budgets (household_id, month);
 
@@ -116,6 +139,7 @@ alter table public.households        enable row level security;
 alter table public.household_members enable row level security;
 alter table public.accounts          enable row level security;
 alter table public.categories        enable row level security;
+alter table public.tags              enable row level security;
 alter table public.transactions      enable row level security;
 alter table public.budgets           enable row level security;
 
@@ -154,7 +178,7 @@ create policy members_delete on public.household_members
 do $$
 declare t text;
 begin
-  foreach t in array array['accounts', 'categories', 'transactions', 'budgets']
+  foreach t in array array['accounts', 'categories', 'tags', 'transactions', 'budgets']
   loop
     execute format('drop policy if exists %1$s_all on public.%1$s;', t);
     execute format(

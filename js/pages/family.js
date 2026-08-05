@@ -66,9 +66,27 @@ App.pages.family = (function () {
       catGroup('Income', 'income'),
     ])
 
+    /* Tags card */
+    const tagsCard = el('div', { class: 'card pad' }, [
+      el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' } }, [
+        el('div', { class: 'section-title', style: { marginBottom: 0 } }, [ui.icon('tag', 18), 'Tags']),
+        el('button', { class: 'btn ghost sm', onClick: () => openTag() }, [ui.icon('plus', 16), 'New']),
+      ]),
+      el('p', { class: 'muted', style: { marginBottom: '10px' }, text: 'Freeform labels you can attach to any transaction and report on.' }),
+      s.data.tags.length === 0
+        ? el('p', { class: 'faint', style: { fontSize: '13px' }, text: 'No tags yet.' })
+        : el('div', { class: 'chips' }, s.data.tags.map((tag) =>
+            el('span', { class: 'chip' }, [
+              el('span', { class: 'dot', style: { background: tag.color } }),
+              tag.name,
+              el('button', { class: 'icon-btn danger', 'aria-label': `Delete ${tag.name}`, style: { padding: '4px' }, onClick: () => delTag(tag) }, [ui.icon('trash', 14)]),
+            ]),
+          )),
+    ])
+
     return el('div', {}, [
-      ui.pageHeader('Family', 'Invite members and manage categories.'),
-      el('div', { class: 'stack' }, [shareCard, membersCard, catsCard]),
+      ui.pageHeader('Family', 'Invite members, categories, and tags.'),
+      el('div', { class: 'stack' }, [shareCard, membersCard, catsCard, tagsCard]),
     ])
   }
 
@@ -120,6 +138,59 @@ App.pages.family = (function () {
     } catch (e) {
       App.ui.toast(e.message || 'Failed to delete', 'error')
     }
+  }
+
+  async function delTag(tag) {
+    if (!(await App.ui.confirm(`Delete the "${tag.name}" tag? It will be removed from any transactions using it.`))) return
+    try {
+      await App.store.getBackend().deleteTag(tag.id)
+      await App.refresh()
+      App.ui.toast('Tag deleted', 'success')
+    } catch (e) {
+      App.ui.toast(e.message || 'Failed to delete', 'error')
+    }
+  }
+
+  function openTag() {
+    const { el } = App.util
+    const ui = App.ui
+    let color = SWATCHES[13] // slate default
+
+    const nameInput = el('input', { class: 'input', required: 'required', placeholder: 'e.g. Vacation, Reimbursable' })
+    nameInput.setAttribute('autofocus', '')
+
+    const swatches = el('div', { class: 'swatches' }, SWATCHES.map((sw) =>
+      el('button', { type: 'button', class: 'swatch' + (sw === color ? ' sel' : ''), style: { background: sw }, 'aria-label': `Color ${sw}`, onClick: (e) => {
+        color = sw
+        swatches.querySelectorAll('.swatch').forEach((b) => b.classList.remove('sel'))
+        e.currentTarget.classList.add('sel')
+      } })))
+
+    const submitBtn = el('button', { class: 'btn primary block', type: 'submit', text: 'Create tag' })
+    const err = el('div', {})
+
+    const form = el('form', {
+      onSubmit: async (e) => {
+        e.preventDefault()
+        ui.clear(err)
+        submitBtn.disabled = true
+        try {
+          await App.store.getBackend().addTag({ name: nameInput.value.trim(), color })
+          await App.refresh()
+          m.close()
+          ui.toast('Tag created', 'success')
+        } catch (ex) {
+          submitBtn.disabled = false
+          err.appendChild(el('div', { class: 'notice error', text: ex.message || 'Failed to save' }))
+        }
+      },
+    }, [
+      el('div', { class: 'field' }, [el('label', { class: 'label', text: 'Name' }), nameInput]),
+      el('div', { class: 'field' }, [el('label', { class: 'label', text: 'Color' }), swatches]),
+      err,
+      submitBtn,
+    ])
+    const m = ui.modal({ title: 'New tag', body: form })
   }
 
   // presetParent: a category object to add a subcategory under, or null for a

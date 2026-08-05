@@ -36,6 +36,7 @@ App.LocalBackend = (function () {
         kind: c.kind,
         color: c.color,
       })),
+      tags: [],
       transactions: [],
       budgets: [],
     }
@@ -52,6 +53,8 @@ App.LocalBackend = (function () {
       data = seed()
       save(data)
     }
+    // Backfill collections added in later versions.
+    if (!data.tags) data.tags = []
     return data
   }
 
@@ -61,6 +64,14 @@ App.LocalBackend = (function () {
   }
 
   const ok = (v) => Promise.resolve(v)
+
+  // Keep only valid split rows: a category (or null) and a positive amount.
+  function normalizeSplits(splits) {
+    if (!Array.isArray(splits)) return []
+    return splits
+      .map((s) => ({ category_id: s.category_id || null, amount: round2(s.amount) }))
+      .filter((s) => s.amount > 0)
+  }
 
   return {
     id: 'local',
@@ -143,8 +154,41 @@ App.LocalBackend = (function () {
       d.categories = d.categories.filter((x) => !ids.has(x.id))
       d.transactions.forEach((t) => {
         if (ids.has(t.category_id)) t.category_id = null
+        if (Array.isArray(t.splits)) {
+          t.splits.forEach((s) => {
+            if (ids.has(s.category_id)) s.category_id = null
+          })
+        }
       })
       d.budgets = d.budgets.filter((b) => !ids.has(b.category_id))
+      save(d)
+      return ok()
+    },
+
+    /* ---- Tags ---- */
+    async listTags() {
+      return ok(load().tags.slice().sort((a, b) => a.name.localeCompare(b.name)))
+    },
+    async addTag({ name, color }) {
+      const d = load()
+      const row = { id: uid(), household_id: d.household.id, name, color: color || '#64748b' }
+      d.tags.push(row)
+      save(d)
+      return ok(row)
+    },
+    async updateTag(id, patch) {
+      const d = load()
+      const t = d.tags.find((x) => x.id === id)
+      if (t) Object.assign(t, patch)
+      save(d)
+      return ok(t)
+    },
+    async deleteTag(id) {
+      const d = load()
+      d.tags = d.tags.filter((x) => x.id !== id)
+      d.transactions.forEach((t) => {
+        if (Array.isArray(t.tag_ids)) t.tag_ids = t.tag_ids.filter((x) => x !== id)
+      })
       save(d)
       return ok()
     },
@@ -170,6 +214,9 @@ App.LocalBackend = (function () {
         kind: input.kind,
         amount: round2(input.amount),
         description: input.description || null,
+        vendor: input.vendor || null,
+        tag_ids: Array.isArray(input.tag_ids) ? input.tag_ids.slice() : [],
+        splits: normalizeSplits(input.splits),
         occurred_on: input.occurred_on,
         created_by: 'local',
         created_at: new Date().toISOString(),
@@ -184,6 +231,8 @@ App.LocalBackend = (function () {
       if (t) {
         Object.assign(t, patch)
         if (patch.amount != null) t.amount = round2(patch.amount)
+        if ('splits' in patch) t.splits = normalizeSplits(patch.splits)
+        if ('tag_ids' in patch) t.tag_ids = Array.isArray(patch.tag_ids) ? patch.tag_ids.slice() : []
       }
       save(d)
       return ok(t)
@@ -238,6 +287,7 @@ App.LocalBackend = (function () {
         exportedAt: new Date().toISOString(),
         household: d.household,
         categories: d.categories,
+        tags: d.tags,
         accounts: d.accounts,
         transactions: d.transactions,
         budgets: d.budgets,
@@ -257,12 +307,14 @@ App.LocalBackend = (function () {
         household,
         members: cur.members,
         categories: backup.categories || [],
+        tags: backup.tags || [],
         accounts: backup.accounts || [],
         transactions: backup.transactions || [],
         budgets: backup.budgets || [],
       }
       // Keep every row pointed at this household for internal consistency.
       next.categories.forEach((c) => (c.household_id = hid))
+      next.tags.forEach((t) => (t.household_id = hid))
       next.accounts.forEach((a) => (a.household_id = hid))
       next.transactions.forEach((t) => (t.household_id = hid))
       next.budgets.forEach((b) => (b.household_id = hid))

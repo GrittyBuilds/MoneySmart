@@ -12,6 +12,7 @@ App.store = (function () {
     members: [],
     accounts: [],
     categories: [],
+    tags: [],
     transactions: [],
   }
 
@@ -30,17 +31,19 @@ App.store = (function () {
   /** Reload the cached core data from the active backend. */
   async function refresh() {
     if (!backend) return
-    const [household, members, accounts, categories, transactions] = await Promise.all([
+    const [household, members, accounts, categories, tags, transactions] = await Promise.all([
       backend.getHousehold(),
       backend.listMembers(),
       backend.listAccounts(),
       backend.listCategories(),
+      backend.listTags ? backend.listTags() : Promise.resolve([]),
       backend.listTransactions(),
     ])
     data.household = household
     data.members = members
     data.accounts = accounts
     data.categories = categories
+    data.tags = tags
     data.transactions = transactions
     notify()
   }
@@ -63,12 +66,30 @@ App.store = (function () {
     }
     return { income, expense, net: income - expense }
   }
+  /**
+   * How a transaction's amount is allocated across categories. A split
+   * transaction returns its split rows; otherwise a single row from
+   * category_id / amount.
+   */
+  function allocations(t) {
+    if (Array.isArray(t.splits) && t.splits.length) {
+      return t.splits.map((s) => ({ category_id: s.category_id || null, amount: Number(s.amount) || 0 }))
+    }
+    return [{ category_id: t.category_id || null, amount: Number(t.amount) || 0 }]
+  }
+
+  function isSplit(t) {
+    return Array.isArray(t.splits) && t.splits.length > 1
+  }
+
   function spendByCategory(txns) {
     const map = new Map()
     for (const t of txns) {
       if (t.kind !== 'expense') continue
-      const key = t.category_id || 'uncategorized'
-      map.set(key, (map.get(key) || 0) + t.amount)
+      for (const a of allocations(t)) {
+        const key = a.category_id || 'uncategorized'
+        map.set(key, (map.get(key) || 0) + a.amount)
+      }
     }
     return map
   }
@@ -118,18 +139,31 @@ App.store = (function () {
     const map = new Map()
     for (const t of txns) {
       if (t.kind !== 'expense') continue
-      const cat = t.category_id ? byId.get(t.category_id) : null
-      const top = cat ? topLevelOf(cat) : null
-      const key = top ? top.id : 'uncategorized'
-      const entry = map.get(key) || {
-        label: top ? top.name : 'Uncategorized',
-        color: top ? top.color : '#64748b',
-        value: 0,
+      for (const a of allocations(t)) {
+        const cat = a.category_id ? byId.get(a.category_id) : null
+        const top = cat ? topLevelOf(cat) : null
+        const key = top ? top.id : 'uncategorized'
+        const entry = map.get(key) || {
+          label: top ? top.name : 'Uncategorized',
+          color: top ? top.color : '#64748b',
+          value: 0,
+        }
+        entry.value += a.amount
+        map.set(key, entry)
       }
-      entry.value += t.amount
-      map.set(key, entry)
     }
     return [...map.values()]
+  }
+
+  const tagMap = () => new Map(data.tags.map((t) => [t.id, t]))
+
+  /** Distinct vendor names seen in transactions (for autocomplete/reporting). */
+  function vendors() {
+    const set = new Set()
+    for (const t of data.transactions) {
+      if (t.vendor && t.vendor.trim()) set.add(t.vendor.trim())
+    }
+    return [...set].sort((a, b) => a.localeCompare(b))
   }
 
   return {
@@ -155,5 +189,10 @@ App.store = (function () {
     orderedCategories,
     topLevelOf,
     rollupSpend,
+    // splits / tags / vendors
+    allocations,
+    isSplit,
+    tagMap,
+    vendors,
   }
 })()

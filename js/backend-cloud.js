@@ -41,6 +41,13 @@ App.CloudBackend = (function () {
     return data || []
   }
 
+  function normalizeSplits(splits) {
+    if (!Array.isArray(splits)) return []
+    return splits
+      .map((s) => ({ category_id: s.category_id || null, amount: Math.round((Number(s.amount) || 0) * 100) / 100 }))
+      .filter((s) => s.amount > 0)
+  }
+
   return {
     id: 'cloud',
     isCloud: true,
@@ -201,6 +208,39 @@ App.CloudBackend = (function () {
       if (error) throw error
     },
 
+    /* ---- Tags ---- */
+    async listTags() {
+      return rows(
+        need()
+          .from('tags')
+          .select('*')
+          .eq('household_id', currentHouseholdId)
+          .order('name', { ascending: true }),
+      )
+    },
+    async addTag(input) {
+      const { error } = await need()
+        .from('tags')
+        .insert({ name: input.name, color: input.color || '#64748b', household_id: currentHouseholdId })
+      if (error) throw error
+    },
+    async updateTag(id, patch) {
+      const { error } = await need().from('tags').update(patch).eq('id', id)
+      if (error) throw error
+    },
+    async deleteTag(id) {
+      const { error } = await need().from('tags').delete().eq('id', id)
+      if (error) throw error
+      // Best-effort: drop the tag id from any transactions that reference it.
+      const tagged = await rows(
+        need().from('transactions').select('id, tag_ids').eq('household_id', currentHouseholdId).contains('tag_ids', [id]),
+      )
+      for (const t of tagged) {
+        const next = (t.tag_ids || []).filter((x) => x !== id)
+        await need().from('transactions').update({ tag_ids: next }).eq('id', t.id)
+      }
+    },
+
     /* ---- Transactions ---- */
     async listTransactions() {
       return rows(
@@ -220,12 +260,18 @@ App.CloudBackend = (function () {
         kind: input.kind,
         amount: round2(input.amount),
         description: input.description || null,
+        vendor: input.vendor || null,
+        tag_ids: Array.isArray(input.tag_ids) ? input.tag_ids : [],
+        splits: normalizeSplits(input.splits),
         occurred_on: input.occurred_on,
       })
       if (error) throw error
     },
     async updateTransaction(id, patch) {
-      const { error } = await need().from('transactions').update(patch).eq('id', id)
+      const next = { ...patch }
+      if ('splits' in next) next.splits = normalizeSplits(next.splits)
+      if ('amount' in next) next.amount = round2(next.amount)
+      const { error } = await need().from('transactions').update(next).eq('id', id)
       if (error) throw error
     },
     async deleteTransaction(id) {
@@ -277,9 +323,10 @@ App.CloudBackend = (function () {
     },
 
     async exportAll() {
-      const [household, categories, accounts, transactions, budgets] = await Promise.all([
+      const [household, categories, tags, accounts, transactions, budgets] = await Promise.all([
         this.getHousehold(),
         this.listCategories(),
+        this.listTags(),
         this.listAccounts(),
         this.listTransactions(),
         rows(need().from('budgets').select('*').eq('household_id', currentHouseholdId)),
@@ -290,6 +337,7 @@ App.CloudBackend = (function () {
         exportedAt: new Date().toISOString(),
         household,
         categories,
+        tags,
         accounts,
         transactions,
         budgets,
@@ -345,6 +393,26 @@ App.CloudBackend = (function () {
         }
       }
 
+      // Tags — de-duplicate by name against existing tags.
+      const existingTags = await this.listTags()
+      const tagByName = new Map(existingTags.map((t) => [t.name.toLowerCase(), t.id]))
+      const tagIdMap = {}
+      for (const tg of dump.tags || []) {
+        const key = (tg.name || '').toLowerCase()
+        if (tagByName.has(key)) {
+          tagIdMap[tg.id] = tagByName.get(key)
+          continue
+        }
+        const { data, error } = await need()
+          .from('tags')
+          .insert({ household_id: hid, name: tg.name, color: tg.color || '#64748b' })
+          .select()
+          .single()
+        if (error) throw error
+        tagIdMap[tg.id] = data.id
+        tagByName.set(key, data.id)
+      }
+
       // Accounts.
       const acctIdMap = {}
       for (const a of dump.accounts || []) {
@@ -357,7 +425,7 @@ App.CloudBackend = (function () {
         acctIdMap[a.id] = data.id
       }
 
-      // Transactions.
+      // Transactions — remap category, account, tag ids, and split categories.
       const txPayload = (dump.transactions || []).map((t) => ({
         household_id: hid,
         account_id: t.account_id ? acctIdMap[t.account_id] || null : null,
@@ -365,6 +433,12 @@ App.CloudBackend = (function () {
         kind: t.kind,
         amount: t.amount,
         description: t.description,
+        vendor: t.vendor || null,
+        tag_ids: (t.tag_ids || []).map((id) => tagIdMap[id]).filter(Boolean),
+        splits: normalizeSplits(t.splits).map((s) => ({
+          category_id: s.category_id ? catIdMap[s.category_id] || null : null,
+          amount: s.amount,
+        })),
         occurred_on: t.occurred_on,
       }))
       if (txPayload.length) {
