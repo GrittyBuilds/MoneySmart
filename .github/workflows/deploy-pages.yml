@@ -5,7 +5,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ["claude/moneysmart-budgeting-app-3gdh1p"]
+    branches: ["main"]
   workflow_dispatch:
 
 # Permissions needed for the GitHub Pages deploy.
