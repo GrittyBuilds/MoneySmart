@@ -51,8 +51,14 @@ create table if not exists public.categories (
   kind         text not null default 'expense',   -- expense | income
   color        text not null default '#10b981',
   icon         text not null default 'tag',
+  -- Self-reference for subcategories; deleting a parent removes its children.
+  parent_id    uuid references public.categories (id) on delete cascade,
   created_at   timestamptz not null default now()
 );
+
+-- Migration for projects created before subcategories existed.
+alter table public.categories
+  add column if not exists parent_id uuid references public.categories (id) on delete cascade;
 
 -- Individual money movements.
 create table if not exists public.transactions (

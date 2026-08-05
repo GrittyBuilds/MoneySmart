@@ -87,6 +87,51 @@ App.store = (function () {
   const expenseCategories = () => data.categories.filter((c) => c.kind === 'expense')
   const incomeCategories = () => data.categories.filter((c) => c.kind === 'income')
 
+  /* ---- Category hierarchy (parent → children) ---- */
+  const childrenOf = (id) =>
+    data.categories.filter((c) => c.parent_id === id).sort((a, b) => a.name.localeCompare(b.name))
+  const topCategories = (kind) =>
+    data.categories
+      .filter((c) => c.kind === kind && !c.parent_id)
+      .sort((a, b) => a.name.localeCompare(b.name))
+
+  /** Flat list of {cat, depth} for a kind: each parent followed by its children. */
+  function orderedCategories(kind) {
+    const out = []
+    for (const parent of topCategories(kind)) {
+      out.push({ cat: parent, depth: 0 })
+      for (const child of childrenOf(parent.id)) out.push({ cat: child, depth: 1 })
+    }
+    return out
+  }
+
+  /** The top-level ancestor of a category (itself if it has no parent). */
+  function topLevelOf(cat) {
+    if (!cat) return null
+    if (!cat.parent_id) return cat
+    return categoryMap().get(cat.parent_id) || cat
+  }
+
+  /** Expense spend rolled up to the top-level category → donut segments. */
+  function rollupSpend(txns) {
+    const byId = categoryMap()
+    const map = new Map()
+    for (const t of txns) {
+      if (t.kind !== 'expense') continue
+      const cat = t.category_id ? byId.get(t.category_id) : null
+      const top = cat ? topLevelOf(cat) : null
+      const key = top ? top.id : 'uncategorized'
+      const entry = map.get(key) || {
+        label: top ? top.name : 'Uncategorized',
+        color: top ? top.color : '#64748b',
+        value: 0,
+      }
+      entry.value += t.amount
+      map.set(key, entry)
+    }
+    return [...map.values()]
+  }
+
   return {
     data,
     setBackend,
@@ -104,5 +149,11 @@ App.store = (function () {
     accountMap,
     expenseCategories,
     incomeCategories,
+    // hierarchy
+    childrenOf,
+    topCategories,
+    orderedCategories,
+    topLevelOf,
+    rollupSpend,
   }
 })()

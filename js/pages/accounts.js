@@ -31,7 +31,7 @@ App.pages.accounts = (function () {
           const bal = s.accountBalance(a)
           return el('div', { class: 'card', style: { padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } }, [
             el('div', { class: 'row-main' }, [
-              el('span', { class: 'avatar', style: { background: 'var(--brand-soft)', color: '#6ee7b7' } }, [ui.icon('wallet', 20)]),
+              el('span', { class: 'avatar', style: { background: 'var(--brand-soft)', color: 'var(--brand-text)' } }, [ui.icon('wallet', 20)]),
               el('div', { style: { minWidth: 0 } }, [
                 el('div', { class: 'row-title', text: a.name }),
                 el('div', { class: 'row-sub', style: { textTransform: 'capitalize' }, text: a.type }),

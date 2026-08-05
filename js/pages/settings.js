@@ -14,11 +14,108 @@ App.pages.settings = (function () {
     const isCloud = App.store.getBackend().isCloud
 
     return el('div', {}, [
-      ui.pageHeader('Settings', 'Currency, storage, and syncing.'),
+      ui.pageHeader('Settings', 'Appearance, currency, backups, and syncing.'),
       el('div', { class: 'stack' }, [
+        appearanceCard(cfg),
         currencyCard(cfg),
+        backupCard(),
         isCloud ? cloudConnectedCard(cfg) : localCard(cfg),
       ]),
+    ])
+  }
+
+  /* ---------- Appearance / theme ---------- */
+  function appearanceCard(cfg) {
+    const { el } = App.util
+    const options = [
+      { value: 'system', label: 'System' },
+      { value: 'light', label: 'Light' },
+      { value: 'dark', label: 'Dark' },
+    ]
+    const seg = el('div', { class: 'segment', style: { maxWidth: '320px' } }, options.map((o) =>
+      el('button', {
+        type: 'button',
+        class: cfg.theme === o.value ? 'on' : '',
+        text: o.label,
+        onClick: () => {
+          App.config.write({ theme: o.value })
+          App.applyTheme()
+          App.refreshThemeButtons()
+          seg.querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', options[i].value === o.value))
+        },
+      })))
+    return el('div', { class: 'card pad' }, [
+      el('div', { class: 'section-title' }, [App.ui.icon('sun', 18), 'Appearance']),
+      el('p', { class: 'muted', style: { marginBottom: '12px' }, text: 'Choose a light or dark theme, or follow your device setting.' }),
+      seg,
+    ])
+  }
+
+  /* ---------- Backup & restore ---------- */
+  function backupCard() {
+    const { el } = App.util
+    const ui = App.ui
+    const isCloud = App.store.getBackend().isCloud
+
+    const exportBtn = el('button', { class: 'btn ghost' }, [ui.icon('download', 16), 'Export backup'])
+    exportBtn.addEventListener('click', async () => {
+      exportBtn.disabled = true
+      try {
+        const backup = await App.store.getBackend().exportAll()
+        App.util.downloadJSON(`moneysmart-backup-${App.util.todayISO()}.json`, backup)
+        ui.toast('Backup downloaded', 'success')
+      } catch (e) {
+        ui.toast(e.message || 'Export failed', 'error')
+      } finally {
+        exportBtn.disabled = false
+      }
+    })
+
+    const fileInput = el('input', { type: 'file', accept: 'application/json,.json', style: { display: 'none' } })
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files && fileInput.files[0]
+      if (!file) return
+      let backup
+      try {
+        backup = JSON.parse(await file.text())
+      } catch {
+        ui.toast('That file is not valid JSON', 'error')
+        fileInput.value = ''
+        return
+      }
+      const counts = `${(backup.accounts || []).length} account(s), ${(backup.categories || []).length} categor(y/ies), ${(backup.transactions || []).length} transaction(s)`
+      const message = isCloud
+        ? `Import ${counts} into this cloud household? Existing data is kept; imported items are added.`
+        : `Restore this backup? It will REPLACE all current local data (${counts}).`
+      if (!(await ui.confirm(message, { danger: !isCloud, okLabel: isCloud ? 'Import' : 'Replace' }))) {
+        fileInput.value = ''
+        return
+      }
+      try {
+        const backend = App.store.getBackend()
+        if (isCloud) {
+          await backend.importDump(backup)
+          await App.refresh()
+          ui.toast('Backup imported', 'success')
+        } else {
+          await backend.importAll(backup)
+          await App.boot()
+          ui.toast('Backup restored', 'success')
+        }
+      } catch (e) {
+        ui.toast(e.message || 'Import failed', 'error')
+      } finally {
+        fileInput.value = ''
+      }
+    })
+    const importBtn = el('button', { class: 'btn ghost', onClick: () => fileInput.click() }, [ui.icon('upload', 16), 'Import backup'])
+
+    return el('div', { class: 'card pad' }, [
+      el('div', { class: 'section-title' }, [App.ui.icon('download', 18), 'Backup & restore']),
+      el('p', { class: 'muted', style: { marginBottom: '12px' }, text: isCloud
+        ? 'Export a JSON copy of this household, or import a backup file to add its data here.'
+        : 'Export a JSON copy of all your data to keep it safe, or import a backup to restore it on this device.' }),
+      el('div', { class: 'row-end', style: { justifyContent: 'flex-start', flexWrap: 'wrap' } }, [exportBtn, importBtn, fileInput]),
     ])
   }
 

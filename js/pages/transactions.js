@@ -116,8 +116,12 @@ App.pages.transactions = (function () {
     function fillCats() {
       ui.clear(catSelect)
       catSelect.appendChild(el('option', { value: '', text: 'Uncategorized' }))
-      s.data.categories.filter((c) => c.kind === kind).forEach((c) =>
-        catSelect.appendChild(el('option', { value: c.id, text: c.name, selected: existing && existing.category_id === c.id })))
+      s.orderedCategories(kind).forEach(({ cat, depth }) =>
+        catSelect.appendChild(el('option', {
+          value: cat.id,
+          text: (depth ? ' ↳ ' : '') + cat.name,
+          selected: existing && existing.category_id === cat.id,
+        })))
     }
     fillCats()
     acctSelect.appendChild(el('option', { value: '', text: 'None' }))

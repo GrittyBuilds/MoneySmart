@@ -126,20 +126,25 @@ App.LocalBackend = (function () {
     async listCategories() {
       return ok(load().categories.slice())
     },
-    async addCategory({ name, kind, color }) {
+    async addCategory({ name, kind, color, parent_id }) {
       const d = load()
-      const row = { id: uid(), household_id: d.household.id, name, kind, color }
+      const row = { id: uid(), household_id: d.household.id, name, kind, color, parent_id: parent_id || null }
       d.categories.push(row)
       save(d)
       return ok(row)
     },
     async deleteCategory(id) {
       const d = load()
-      d.categories = d.categories.filter((x) => x.id !== id)
-      d.transactions.forEach((t) => {
-        if (t.category_id === id) t.category_id = null
+      // Deleting a parent also removes its subcategories (cascade).
+      const ids = new Set([id])
+      d.categories.forEach((c) => {
+        if (c.parent_id === id) ids.add(c.id)
       })
-      d.budgets = d.budgets.filter((b) => b.category_id !== id)
+      d.categories = d.categories.filter((x) => !ids.has(x.id))
+      d.transactions.forEach((t) => {
+        if (ids.has(t.category_id)) t.category_id = null
+      })
+      d.budgets = d.budgets.filter((b) => !ids.has(b.category_id))
       save(d)
       return ok()
     },
@@ -222,6 +227,47 @@ App.LocalBackend = (function () {
     /* Export the raw store — used to migrate local data into the cloud. */
     _dump() {
       return load()
+    },
+
+    /* ---- Backup / restore ---- */
+    async exportAll() {
+      const d = load()
+      return {
+        app: 'moneysmart',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        household: d.household,
+        categories: d.categories,
+        accounts: d.accounts,
+        transactions: d.transactions,
+        budgets: d.budgets,
+      }
+    },
+
+    /** Replace all local data with a previously exported backup. */
+    async importAll(backup) {
+      if (!backup || !Array.isArray(backup.categories) || !Array.isArray(backup.transactions)) {
+        throw new Error('This file is not a valid MoneySmart backup.')
+      }
+      const cur = load()
+      const household =
+        backup.household && backup.household.id ? backup.household : cur.household
+      const hid = household.id
+      const next = {
+        household,
+        members: cur.members,
+        categories: backup.categories || [],
+        accounts: backup.accounts || [],
+        transactions: backup.transactions || [],
+        budgets: backup.budgets || [],
+      }
+      // Keep every row pointed at this household for internal consistency.
+      next.categories.forEach((c) => (c.household_id = hid))
+      next.accounts.forEach((a) => (a.household_id = hid))
+      next.transactions.forEach((t) => (t.household_id = hid))
+      next.budgets.forEach((b) => (b.household_id = hid))
+      save(next)
+      return ok()
     },
   }
 })()

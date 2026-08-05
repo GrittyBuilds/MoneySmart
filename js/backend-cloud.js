@@ -186,9 +186,14 @@ App.CloudBackend = (function () {
       )
     },
     async addCategory(input) {
-      const { error } = await need()
-        .from('categories')
-        .insert({ ...input, icon: 'tag', household_id: currentHouseholdId })
+      const { error } = await need().from('categories').insert({
+        name: input.name,
+        kind: input.kind,
+        color: input.color,
+        parent_id: input.parent_id || null,
+        icon: 'tag',
+        household_id: currentHouseholdId,
+      })
       if (error) throw error
     },
     async deleteCategory(id) {
@@ -271,28 +276,72 @@ App.CloudBackend = (function () {
       }
     },
 
-    /** Bulk-import a local data dump into the current cloud household. */
+    async exportAll() {
+      const [household, categories, accounts, transactions, budgets] = await Promise.all([
+        this.getHousehold(),
+        this.listCategories(),
+        this.listAccounts(),
+        this.listTransactions(),
+        rows(need().from('budgets').select('*').eq('household_id', currentHouseholdId)),
+      ])
+      return {
+        app: 'moneysmart',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        household,
+        categories,
+        accounts,
+        transactions,
+        budgets,
+      }
+    },
+
+    // Back-compat alias for the old name.
     async importLocalDump(dump) {
+      return this.importDump(dump)
+    },
+
+    /** Bulk-import a data dump / backup into the current cloud household. */
+    async importDump(dump) {
       const hid = currentHouseholdId
       if (!hid) throw new Error('No household selected')
+      if (!dump || !Array.isArray(dump.categories)) {
+        throw new Error('This file is not a valid MoneySmart backup.')
+      }
 
-      // Map local category ids -> new cloud ids by name+kind.
+      // Top-level categories are de-duplicated against existing ones by
+      // name+kind; subcategories are always inserted and linked to their
+      // (already-inserted) parent's new id.
       const existingCats = await this.listCategories()
-      const byName = new Map(existingCats.map((c) => [c.kind + '|' + c.name.toLowerCase(), c.id]))
+      const byName = new Map(
+        existingCats.filter((c) => !c.parent_id).map((c) => [c.kind + '|' + c.name.toLowerCase(), c.id]),
+      )
       const catIdMap = {}
-      for (const c of dump.categories || []) {
-        const key = c.kind + '|' + c.name.toLowerCase()
-        if (byName.has(key)) {
-          catIdMap[c.id] = byName.get(key)
-        } else {
+      const src = dump.categories || []
+      const ordered = [...src.filter((c) => !c.parent_id), ...src.filter((c) => c.parent_id)]
+      for (const c of ordered) {
+        if (!c.parent_id) {
+          const key = c.kind + '|' + c.name.toLowerCase()
+          if (byName.has(key)) {
+            catIdMap[c.id] = byName.get(key)
+            continue
+          }
           const { data, error } = await need()
             .from('categories')
-            .insert({ household_id: hid, name: c.name, kind: c.kind, color: c.color, icon: 'tag' })
+            .insert({ household_id: hid, name: c.name, kind: c.kind, color: c.color, icon: 'tag', parent_id: null })
             .select()
             .single()
           if (error) throw error
           catIdMap[c.id] = data.id
           byName.set(key, data.id)
+        } else {
+          const { data, error } = await need()
+            .from('categories')
+            .insert({ household_id: hid, name: c.name, kind: c.kind, color: c.color, icon: 'tag', parent_id: catIdMap[c.parent_id] || null })
+            .select()
+            .single()
+          if (error) throw error
+          catIdMap[c.id] = data.id
         }
       }
 

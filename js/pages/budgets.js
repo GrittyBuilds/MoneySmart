@@ -38,16 +38,13 @@ App.pages.budgets = (function () {
     const budgetMap = new Map(budgets.map((b) => [b.category_id, b.amount]))
     const cats = s.expenseCategories()
 
-    const rows = cats.map((cat) => ({
+    // Keep parent → subcategory order so the hierarchy reads top to bottom.
+    const rows = s.orderedCategories('expense').map(({ cat, depth }) => ({
       cat,
+      depth,
       budget: budgetMap.get(cat.id) || 0,
       spent: spend.get(cat.id) || 0,
-    })).sort((a, b) => {
-      const ab = a.budget > 0 ? 1 : 0
-      const bb = b.budget > 0 ? 1 : 0
-      if (ab !== bb) return bb - ab
-      return b.spent - a.spent
-    })
+    }))
 
     let budgeted = 0
     let spent = 0
@@ -71,15 +68,19 @@ App.pages.budgets = (function () {
     const list = el('div', { class: 'stack', style: { marginTop: '16px' } }, rows.map((r) => budgetRow(r)))
     body.appendChild(list)
 
-    function budgetRow({ cat, budget, spent }) {
+    function budgetRow({ cat, depth, budget, spent }) {
       const has = budget > 0
       const pct = has ? Math.min(100, (spent / budget) * 100) : 0
       const over = has && spent > budget
       const barColor = over ? '#f43f5e' : pct > 80 ? '#f59e0b' : cat.color
 
-      return el('div', { class: 'card budget-row' }, [
+      return el('div', { class: 'card budget-row' + (depth ? ' sub' : '') }, [
         el('div', { class: 'budget-top' }, [
-          el('div', { class: 'budget-cat' }, [el('span', { class: 'dot', style: { background: cat.color } }), cat.name]),
+          el('div', { class: 'budget-cat' }, [
+            depth ? el('span', { class: 'cat-branch', text: '↳' }) : null,
+            el('span', { class: 'dot', style: { background: cat.color } }),
+            cat.name,
+          ]),
           el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
             el('span', { class: 'budget-nums', html: money(spent) + (has ? ` <span class="of">/ ${money(budget)}</span>` : '') }),
             el('button', { class: 'icon-btn', 'aria-label': 'Set budget', onClick: () => openBudget(cat, budget) }, [ui.icon('edit', 16)]),

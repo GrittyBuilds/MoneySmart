@@ -19,6 +19,57 @@ const BOTTOM = NAV.slice(0, 5) // Dashboard..Family; Settings via gear/sidebar
 
 const root = () => App.util.$('#app')
 
+/* -------------------------------------------------------------------------- */
+/* Theme (light / dark / system)                                               */
+/* -------------------------------------------------------------------------- */
+function systemPrefersLight() {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+}
+
+/* Resolve the configured theme and apply it to the document. */
+App.applyTheme = function () {
+  const pref = App.config.get('theme') || 'system'
+  const resolved = pref === 'system' ? (systemPrefersLight() ? 'light' : 'dark') : pref
+  document.documentElement.setAttribute('data-theme', resolved)
+  App.state.resolvedTheme = resolved
+  const meta = App.util.$('meta[name="theme-color"]')
+  if (meta) meta.setAttribute('content', resolved === 'light' ? '#f1f5f9' : '#0b1120')
+}
+
+/* Flip between explicit light/dark (used by the quick toggle button). */
+App.toggleTheme = function () {
+  const next = App.state.resolvedTheme === 'light' ? 'dark' : 'light'
+  App.config.write({ theme: next })
+  App.applyTheme()
+  App.refreshThemeButtons()
+  // Keep any theme controls in the current page (e.g. Settings) in sync.
+  App.router.render()
+}
+
+App.refreshThemeButtons = function () {
+  const name = App.state.resolvedTheme === 'light' ? 'moon' : 'sun'
+  const label = App.state.resolvedTheme === 'light' ? 'Dark mode' : 'Light mode'
+  App.util.$$('.theme-toggle').forEach((b) => {
+    const iconHost = b.querySelector('.icon')
+    if (iconHost) iconHost.replaceWith(App.ui.icon(name, b.dataset.iconSize ? Number(b.dataset.iconSize) : 20))
+    const lbl = b.querySelector('.theme-label')
+    if (lbl) lbl.textContent = label
+  })
+}
+
+// Follow the system when the OS theme changes and the app is set to "system".
+if (window.matchMedia) {
+  const mq = window.matchMedia('(prefers-color-scheme: light)')
+  const onChange = () => {
+    if ((App.config.get('theme') || 'system') === 'system') {
+      App.applyTheme()
+      App.refreshThemeButtons()
+    }
+  }
+  if (mq.addEventListener) mq.addEventListener('change', onChange)
+  else if (mq.addListener) mq.addListener(onChange)
+}
+
 /* Re-render only the current route (data already in cache). */
 App.rerender = function () {
   App.router.render()
@@ -44,6 +95,7 @@ App.router.register('/settings', App.pages.settings)
 App.boot = async function () {
   const { el } = App.util
   App.util.setCurrency(App.config.get('currency'))
+  App.applyTheme()
   App.ui.closeModal()
   App.util.clear(root()).appendChild(App.ui.spinner('Loading MoneySmart…'))
 
@@ -142,21 +194,40 @@ async function switchHousehold(id) {
   renderShell()
 }
 
+// A nav-item-styled button that flips the theme; label + icon reflect state.
+function themeNavButton() {
+  const { el } = App.util
+  const isLight = App.state.resolvedTheme === 'light'
+  return el('button', {
+    class: 'nav-btn theme-toggle',
+    onClick: () => App.toggleTheme(),
+  }, [App.ui.icon(isLight ? 'moon' : 'sun', 20), el('span', { class: 'theme-label', text: isLight ? 'Dark mode' : 'Light mode' })])
+}
+
+// A compact icon-only theme toggle for the mobile top bar.
+function themeIconButton() {
+  const { el } = App.util
+  const isLight = App.state.resolvedTheme === 'light'
+  return el('button', { class: 'icon-btn theme-toggle', dataset: { iconSize: '20' }, 'aria-label': 'Toggle light or dark theme', onClick: () => App.toggleTheme() }, [App.ui.icon(isLight ? 'moon' : 'sun', 20)])
+}
+
 function sideFoot() {
   const { el } = App.util
+  const themeBtn = themeNavButton()
   if (App.state.mode === 'cloud') {
     return el('div', { class: 'side-foot' }, [
       el('div', { class: 'who', text: (App.state.user && App.state.user.email) || '' }),
+      themeBtn,
       el('button', {
-        style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '11px', color: 'var(--muted)', background: 'none', border: 'none', width: '100%', fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer' },
+        class: 'nav-btn',
         onClick: async () => { await App.CloudBackend.signOut(); await App.boot() },
       }, [App.ui.icon('logout', 20), el('span', { text: 'Sign out' })]),
     ])
   }
   return el('div', { class: 'side-foot' }, [
-    el('div', { class: 'who', text: 'Local storage · this device' }),
-    el('a', { href: '#/settings', style: { display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--brand)', fontSize: '0.85rem', textDecoration: 'none', padding: '4px' } }, [
-      App.ui.icon('cloud', 16), el('span', { text: 'Connect Supabase to sync' }),
+    themeBtn,
+    el('a', { href: '#/settings', class: 'nav-btn', style: { color: 'var(--brand)', textDecoration: 'none' } }, [
+      App.ui.icon('cloud', 20), el('span', { text: 'Connect Supabase' }),
     ]),
   ])
 }
@@ -174,6 +245,7 @@ function renderShell() {
   const outlet = el('div', { id: 'outlet' })
 
   const topbarRight = el('div', { style: { display: 'flex', gap: '4px' } }, [
+    themeIconButton(),
     el('a', { href: '#/settings', class: 'icon-btn', 'aria-label': 'Settings' }, [App.ui.icon('settings', 20)]),
     App.state.mode === 'cloud'
       ? el('button', { class: 'icon-btn', 'aria-label': 'Sign out', onClick: async () => { await App.CloudBackend.signOut(); await App.boot() } }, [App.ui.icon('logout', 20)])

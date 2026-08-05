@@ -16,13 +16,23 @@ devices and share one budget with your family.
   spending-by-category donut, a 6-month income-vs-expense bar chart, and recent
   activity. Charts are hand-drawn SVG — no chart library.
 - **💸 Transactions** — add, edit, delete, search, and filter income & expenses.
-- **🎯 Budgets by category** — set a monthly limit per category with progress
-  bars that turn amber near the limit and red when exceeded.
+- **🏷️ Categories & subcategories** — add and remove your own categories, and
+  nest subcategories under them. Deleting a category also removes its
+  subcategories. The dashboard donut rolls spending up to the top-level
+  category for a clean overview.
+- **🎯 Budgets by category** — set a monthly limit per category (or
+  subcategory) with progress bars that turn amber near the limit and red when
+  exceeded.
 - **🏦 Accounts** — checking, savings, cash, and credit balances that update
   automatically from your transactions.
 - **👨‍👩‍👧 Family sharing** *(cloud mode)* — invite family members with a code so
   everyone shares one budget, each with their own login. Row Level Security
   keeps every household's data private.
+- **💾 Backup & restore** — export a JSON copy of all your data from **Settings**
+  with one click, and import it later to restore it on this device (or add it
+  into a cloud household).
+- **🌗 Light & dark themes** — pick Light, Dark, or follow your device setting.
+  A quick toggle lives in the sidebar (and the mobile top bar).
 - **📱 Responsive** — a mobile-first layout with a desktop sidebar and a mobile
   bottom tab bar. Add it to your home screen (it ships a web manifest).
 

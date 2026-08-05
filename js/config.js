@@ -10,6 +10,7 @@ App.config = (function () {
   const DEFAULTS = {
     mode: 'local', // 'local' | 'cloud'
     currency: 'USD',
+    theme: 'system', // 'system' | 'light' | 'dark'
     supabaseUrl: '',
     supabaseKey: '',
   }

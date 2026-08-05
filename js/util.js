@@ -107,11 +107,22 @@ App.util = (function () {
     return Math.random().toString(36).slice(2, 10)
   }
 
+  /** Trigger a client-side download of `obj` as a pretty-printed JSON file. */
+  function downloadJSON(filename, obj) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = el('a', { href: url, download: filename })
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
   return {
     $, $$, el, clear, escapeHtml,
     money, moneyCompact, round2, setCurrency, getCurrency,
     parseISO, toISO, todayISO, startOfMonth, endOfMonth, addMonths,
     monthKey, sameMonth, monthLabel, prettyDate, shortDate,
-    uid, inviteCode,
+    uid, inviteCode, downloadJSON,
   }
 })()

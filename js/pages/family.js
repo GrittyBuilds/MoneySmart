@@ -45,7 +45,7 @@ App.pages.family = (function () {
       el('div', { class: 'list' }, s.data.members.map((m) =>
         el('div', { class: 'row' }, [
           el('div', { class: 'row-main' }, [
-            el('span', { class: 'avatar', style: { background: 'var(--brand-soft)', color: '#6ee7b7', borderRadius: '50%' }, text: ((m.display_name || '?')[0] || '?').toUpperCase() }),
+            el('span', { class: 'avatar', style: { background: 'var(--brand-soft)', color: 'var(--brand-text)', borderRadius: '50%' }, text: ((m.display_name || '?')[0] || '?').toUpperCase() }),
             el('div', {}, [
               el('div', { class: 'row-title', text: (m.display_name || 'Member') }),
               el('div', { class: 'row-sub', style: { textTransform: 'capitalize' }, text: m.role }),
@@ -59,10 +59,11 @@ App.pages.family = (function () {
     const catsCard = el('div', { class: 'card pad' }, [
       el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' } }, [
         el('div', { class: 'section-title', style: { marginBottom: 0 } }, [ui.icon('budget', 18), 'Categories']),
-        el('button', { class: 'btn ghost sm', onClick: () => openCat() }, [ui.icon('plus', 16), 'New']),
+        el('button', { class: 'btn ghost sm', onClick: () => openCat(null) }, [ui.icon('plus', 16), 'New']),
       ]),
-      catGroup('Expenses', s.expenseCategories()),
-      catGroup('Income', s.incomeCategories()),
+      el('p', { class: 'muted', style: { marginBottom: '6px' }, text: 'Add categories and subcategories. Deleting a category also removes its subcategories.' }),
+      catGroup('Expenses', 'expense'),
+      catGroup('Income', 'income'),
     ])
 
     return el('div', {}, [
@@ -71,24 +72,47 @@ App.pages.family = (function () {
     ])
   }
 
-  function catGroup(title, cats) {
+  function catGroup(title, kind) {
     const { el } = App.util
     const ui = App.ui
-    if (cats.length === 0) return document.createComment('')
-    return el('div', { style: { marginTop: '10px' } }, [
+    const s = App.store
+    const parents = s.topCategories(kind)
+    if (parents.length === 0) return document.createComment('')
+
+    return el('div', { style: { marginTop: '14px' } }, [
       el('div', { class: 'label', text: title }),
-      el('div', { class: 'chips' }, cats.map((c) =>
-        el('span', { class: 'chip' }, [
-          el('span', { class: 'dot', style: { background: c.color } }),
-          c.name,
-          el('button', { class: 'icon-btn danger', 'aria-label': `Delete ${c.name}`, style: { padding: '4px' }, onClick: () => delCat(c) }, [ui.icon('trash', 14)]),
-        ]),
-      )),
+      el('div', { class: 'cat-tree' }, parents.map((p) => {
+        const kids = s.childrenOf(p.id)
+        return el('div', { class: 'cat-node' }, [
+          el('div', { class: 'cat-parent' }, [
+            el('span', { class: 'dot', style: { background: p.color } }),
+            el('span', { class: 'cat-name', text: p.name }),
+            el('div', { class: 'cat-actions' }, [
+              el('button', { class: 'btn ghost sm', 'aria-label': `Add subcategory to ${p.name}`, onClick: () => openCat(p) }, [ui.icon('plus', 14), 'Sub']),
+              el('button', { class: 'icon-btn danger', 'aria-label': `Delete ${p.name}`, onClick: () => delCat(p) }, [ui.icon('trash', 15)]),
+            ]),
+          ]),
+          kids.length
+            ? el('div', { class: 'cat-children' }, kids.map((c) =>
+                el('div', { class: 'cat-child' }, [
+                  el('span', { class: 'cat-branch', text: '↳' }),
+                  el('span', { class: 'dot', style: { background: c.color } }),
+                  el('span', { class: 'cat-name', text: c.name }),
+                  el('button', { class: 'icon-btn danger', 'aria-label': `Delete ${c.name}`, onClick: () => delCat(c) }, [ui.icon('trash', 14)]),
+                ]),
+              ))
+            : null,
+        ])
+      })),
     ])
   }
 
   async function delCat(c) {
-    if (!(await App.ui.confirm(`Delete the "${c.name}" category? Its transactions are kept but uncategorized.`))) return
+    const kids = App.store.childrenOf(c.id)
+    const extra = kids.length
+      ? ` This also deletes its ${kids.length} subcategor${kids.length === 1 ? 'y' : 'ies'}.`
+      : ''
+    if (!(await App.ui.confirm(`Delete the "${c.name}" category?${extra} Transactions are kept but uncategorized.`))) return
     try {
       await App.store.getBackend().deleteCategory(c.id)
       await App.refresh()
@@ -98,19 +122,37 @@ App.pages.family = (function () {
     }
   }
 
-  function openCat() {
+  // presetParent: a category object to add a subcategory under, or null for a
+  // top-level category (with an optional parent picker).
+  function openCat(presetParent) {
     const { el } = App.util
     const ui = App.ui
-    let kind = 'expense'
-    let color = SWATCHES[0]
+    const s = App.store
 
-    const nameInput = el('input', { class: 'input', required: 'required', placeholder: 'e.g. Groceries' })
+    let kind = presetParent ? presetParent.kind : 'expense'
+    let parentId = presetParent ? presetParent.id : ''
+    let color = presetParent ? presetParent.color : SWATCHES[0]
+
+    const nameInput = el('input', { class: 'input', required: 'required', placeholder: presetParent ? 'e.g. Fresh produce' : 'e.g. Groceries' })
     nameInput.setAttribute('autofocus', '')
+
+    // Parent picker (top-level mode only) — repopulated when the kind changes.
+    const parentSelect = el('select', { class: 'input' })
+    function fillParents() {
+      ui.clear(parentSelect)
+      parentSelect.appendChild(el('option', { value: '', text: 'None (top-level category)' }))
+      s.topCategories(kind).forEach((p) =>
+        parentSelect.appendChild(el('option', { value: p.id, text: p.name, selected: p.id === parentId })))
+    }
+    parentSelect.addEventListener('change', () => { parentId = parentSelect.value })
+    if (!presetParent) fillParents()
 
     const seg = el('div', { class: 'segment' }, ['expense', 'income'].map((k) =>
       el('button', { type: 'button', class: (kind === k ? 'on' : ''), text: k, onClick: () => {
         kind = k
+        parentId = ''
         seg.querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', ['expense', 'income'][i] === k))
+        fillParents()
       } })))
 
     const swatches = el('div', { class: 'swatches' }, SWATCHES.map((sw) =>
@@ -120,8 +162,15 @@ App.pages.family = (function () {
         e.currentTarget.classList.add('sel')
       } })))
 
-    const submitBtn = el('button', { class: 'btn primary block', type: 'submit', text: 'Create category' })
+    const submitBtn = el('button', { class: 'btn primary block', type: 'submit', text: presetParent ? 'Add subcategory' : 'Create category' })
     const err = el('div', {})
+
+    const topFields = presetParent
+      ? el('div', { class: 'notice ok', style: { marginBottom: '4px' }, text: `Subcategory of ${presetParent.name} · ${kind}` })
+      : el('div', {}, [
+          seg,
+          el('div', { class: 'field', style: { marginTop: '14px' } }, [el('label', { class: 'label', text: 'Parent category (optional)' }), parentSelect]),
+        ])
 
     const form = el('form', {
       onSubmit: async (e) => {
@@ -129,23 +178,23 @@ App.pages.family = (function () {
         ui.clear(err)
         submitBtn.disabled = true
         try {
-          await App.store.getBackend().addCategory({ name: nameInput.value.trim(), kind, color })
+          await App.store.getBackend().addCategory({ name: nameInput.value.trim(), kind, color, parent_id: parentId || null })
           await App.refresh()
           m.close()
-          ui.toast('Category created', 'success')
+          ui.toast(presetParent ? 'Subcategory created' : 'Category created', 'success')
         } catch (ex) {
           submitBtn.disabled = false
           err.appendChild(el('div', { class: 'notice error', text: ex.message || 'Failed to save' }))
         }
       },
     }, [
-      seg,
+      topFields,
       el('div', { class: 'field', style: { marginTop: '14px' } }, [el('label', { class: 'label', text: 'Name' }), nameInput]),
       el('div', { class: 'field' }, [el('label', { class: 'label', text: 'Color' }), swatches]),
       err,
       submitBtn,
     ])
-    const m = ui.modal({ title: 'New category', body: form })
+    const m = ui.modal({ title: presetParent ? 'New subcategory' : 'New category', body: form })
   }
 
   return render

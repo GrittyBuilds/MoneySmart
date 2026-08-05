@@ -6,6 +6,21 @@
     <meta name="theme-color" content="#10b981" />
     <meta name="description" content="MoneySmart — a simple family budgeting web app." />
     <title>MoneySmart — Family Budgeting</title>
+    <!-- Apply the saved theme before first paint to avoid a flash of the wrong colors. -->
+    <script>
+      (function () {
+        try {
+          var s = JSON.parse(localStorage.getItem('moneysmart.settings') || '{}')
+          var t = s.theme || 'system'
+          if (t === 'system') {
+            t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+          }
+          document.documentElement.setAttribute('data-theme', t)
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark')
+        }
+      })()
+    </script>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />

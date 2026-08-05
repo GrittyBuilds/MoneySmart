@@ -19,14 +19,8 @@ App.pages.dashboard = (function () {
     const totals = s.sumTotals(monthTx)
     const balance = s.totalBalance()
 
-    // Spending by category → donut segments.
-    const spend = s.spendByCategory(monthTx)
-    const segments = [...spend.entries()]
-      .map(([cid, value]) => {
-        const c = cats.get(cid)
-        return { label: c ? c.name : 'Uncategorized', value, color: c ? c.color : '#64748b' }
-      })
-      .sort((a, b) => b.value - a.value)
+    // Spending by category → donut segments (rolled up to top-level category).
+    const segments = s.rollupSpend(monthTx).sort((a, b) => b.value - a.value)
 
     // 6-month income/expense trend.
     const labels = []
