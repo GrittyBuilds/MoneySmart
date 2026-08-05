@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-950 text-slate-100 antialiased;
+  /* Respect device safe areas (notches, home indicators) on mobile. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg shadow-black/20;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
+           transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand-500 text-slate-950 hover:bg-brand-400;
+  }
+  .btn-ghost {
+    @apply btn bg-slate-800 text-slate-100 hover:bg-slate-700;
+  }
+  .btn-danger {
+    @apply btn bg-red-500/90 text-white hover:bg-red-500;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3.5 py-2.5 text-sm
+           text-slate-100 placeholder:text-slate-500
+           focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400;
+  }
+}
+
+/* Hide number input spinners for a cleaner money field. */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
