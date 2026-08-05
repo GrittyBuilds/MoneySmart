@@ -1,0 +1,17 @@
+{
+  "name": "MoneySmart",
+  "short_name": "MoneySmart",
+  "description": "A simple family budgeting web app.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

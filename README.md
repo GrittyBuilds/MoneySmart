@@ -1,117 +1,106 @@
 # MoneySmart 💰
 
-A simple, responsive **family budgeting app** that syncs across every device via
-[Supabase](https://supabase.com). Installable as a PWA on both phones and
-desktops — one codebase, works everywhere.
+A simple **family budgeting web app** built with plain **HTML, CSS, and vanilla
+JavaScript** — no build step, no framework, no bundler. Open it in a browser and
+it just works.
 
-![Stack](https://img.shields.io/badge/React-18-149eca) ![Vite](https://img.shields.io/badge/Vite-5-646cff) ![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ecf8e) ![PWA](https://img.shields.io/badge/PWA-installable-10b981)
+It starts fully **offline using your browser's storage**, and you can optionally
+**connect a free [Supabase](https://supabase.com) project** to sync across
+devices and share one budget with your family.
+
+![No build step](https://img.shields.io/badge/build-none-10b981) ![Vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e) ![Storage](https://img.shields.io/badge/storage-local%20%2B%20Supabase-3ecf8e)
 
 ## Features
 
-- **📊 Dashboard** — total balance, monthly income/expenses/net, spending-by-category
-  donut, a 6-month income-vs-expense trend, and recent activity.
+- **📊 Dashboard** — total balance, monthly income / expenses / net, a
+  spending-by-category donut, a 6-month income-vs-expense bar chart, and recent
+  activity. Charts are hand-drawn SVG — no chart library.
 - **💸 Transactions** — add, edit, delete, search, and filter income & expenses.
-- **🎯 Budgets by category** — set a monthly limit per category and watch progress
-  bars turn amber then red as you approach and exceed them.
-- **🏦 Accounts** — track checking, savings, cash, and credit balances that update
+- **🎯 Budgets by category** — set a monthly limit per category with progress
+  bars that turn amber near the limit and red when exceeded.
+- **🏦 Accounts** — checking, savings, cash, and credit balances that update
   automatically from your transactions.
-- **👨‍👩‍👧 Family sharing** — invite family members with a code so everyone shares one
-  budget, each with their own login. Row Level Security keeps every household's
-  data private.
-- **📱 Responsive + installable** — a mobile-first layout with a desktop sidebar,
-  plus offline-ready PWA support so you can install it to your home screen or
-  desktop.
+- **👨‍👩‍👧 Family sharing** *(cloud mode)* — invite family members with a code so
+  everyone shares one budget, each with their own login. Row Level Security
+  keeps every household's data private.
+- **📱 Responsive** — a mobile-first layout with a desktop sidebar and a mobile
+  bottom tab bar. Add it to your home screen (it ships a web manifest).
 
-## Tech stack
+## Two ways to store data
 
-| Layer     | Choice                                            |
-| --------- | ------------------------------------------------- |
-| UI        | React 18 + TypeScript + Vite                      |
-| Styling   | Tailwind CSS                                      |
-| Charts    | Recharts                                          |
-| Icons     | lucide-react                                      |
-| Backend   | Supabase (Postgres, Auth, Row Level Security)     |
-| Packaging | vite-plugin-pwa (installable, offline-capable)    |
+| Mode | Setup | Syncs across devices | Family sharing |
+| --- | --- | --- | --- |
+| **Local** (default) | None — just open the app | No (one device) | No |
+| **Cloud** (Supabase) | Paste your project URL + key | Yes | Yes |
 
-## Getting started
+You can start local and connect Supabase later from **Settings**, and even
+**import your existing local data** into the cloud household in one click.
 
-### 1. Create a Supabase project
+## Running it
 
-1. Sign up at [supabase.com](https://supabase.com) and create a new project (the
-   free tier is plenty for a family).
-2. Open the **SQL Editor**, paste the contents of
-   [`supabase/schema.sql`](supabase/schema.sql), and click **Run**. This creates
-   all tables, Row Level Security policies, and the helper functions used for
-   creating and joining households.
-
-### 2. Configure the app
+Because it's just static files, any of these work:
 
 ```bash
-cp .env.example .env
+# 1. Open directly — double-click index.html (local mode works offline)
+
+# 2. Or serve it with any static server:
+python3 -m http.server 8000      # then open http://localhost:8000
+#   npx serve .
+#   php -S localhost:8000
 ```
 
-Fill in the two values from **Supabase → Project Settings → API**:
+> **Tip:** Cloud (Supabase) mode needs the app served over `http(s)://` so the
+> Supabase library can load from its CDN. Local mode works even from `file://`.
 
-```
-VITE_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-public-key
-```
+Deploy the folder as-is to any static host — GitHub Pages, Netlify, Vercel,
+Cloudflare Pages, or Supabase Storage.
 
-> The anon/public key is safe to ship in a client app — Row Level Security in
-> the schema ensures each household can only read and write its own data.
+## Connecting Supabase (optional, for sync + family sharing)
 
-### 3. Run it
+1. Create a free project at [supabase.com](https://supabase.com).
+2. Open the **SQL editor** and run the contents of
+   [`supabase/schema.sql`](supabase/schema.sql). This creates all tables, Row
+   Level Security policies, and the create/join-household functions.
+3. In the app, go to **Settings → Storage & sync**, paste your **Project URL**
+   and **anon public key** (Supabase → Project Settings → API), and click
+   **Connect & sync**.
+4. Sign up, then **create a household** (or **join** one with an invite code
+   from a family member on their **Family** page).
 
-```bash
-npm install
-npm run dev
-```
-
-Open http://localhost:5173. Sign up, then **create a household** (or **join** one
-with an invite code from a family member).
-
-### Build for production
-
-```bash
-npm run build      # type-checks and builds to dist/
-npm run preview    # serve the production build locally
-```
-
-The output in `dist/` is a static PWA you can host anywhere (Netlify, Vercel,
-Cloudflare Pages, GitHub Pages, or Supabase Hosting).
-
-## Using it as an app
-
-- **Mobile** (iOS/Android): open the site in the browser and choose
-  **Add to Home Screen**.
-- **Desktop** (Chrome/Edge): click the **install** icon in the address bar to run
-  MoneySmart in its own window.
-
-Want a true native desktop binary later? The same web build drops straight into
-[Tauri](https://tauri.app/) or Electron with no code changes.
-
-## How family sharing works
-
-A **household** is a shared budget space. When you create one you become its
-owner and get an 8-character **invite code** (shown on the **Family** page).
-Family members sign up, choose **Join**, and enter that code. Everyone then sees
-the same accounts, transactions, budgets, and categories in real time across
-their devices, while Postgres Row Level Security guarantees other households
-can't see your data.
+> The anon key is safe to keep in the browser — Row Level Security in the schema
+> ensures each household can only read and write its own data.
 
 ## Project structure
 
 ```
-src/
-├── components/     # Layout (responsive nav), Modal, MonthPicker, UI kit
-├── context/        # AuthContext, HouseholdContext (current household + members)
-├── hooks/          # useAccounts, useTransactions, useBudgets
-├── lib/            # supabase client, types, money/date formatting, computations
-└── pages/          # Login, Onboarding, Dashboard, Transactions, Budgets,
-                    #   Accounts, Family, SetupNeeded
+index.html              # loads the stylesheet + scripts (in order)
+styles.css              # dark theme, responsive layout
+favicon.svg             # app icon
+manifest.webmanifest    # add-to-home-screen metadata
+js/
+├── util.js             # DOM, money & date helpers, ids
+├── config.js           # persisted settings (mode, currency, Supabase keys)
+├── ui.js               # modal, confirm, toast, icons, stat card, month picker
+├── charts.js           # dependency-free SVG donut + bar charts
+├── store.js            # active backend + cached data + calculations
+├── backend-local.js    # localStorage backend
+├── backend-cloud.js    # Supabase backend (SDK lazy-loaded from CDN)
+├── router.js           # tiny hash router
+├── app.js              # bootstrap: backend choice, auth, shell, nav
+└── pages/
+    ├── dashboard.js  transactions.js  budgets.js
+    ├── accounts.js   family.js        settings.js
 supabase/
-└── schema.sql      # tables + RLS policies + create/join household RPCs
+└── schema.sql          # tables + RLS + create/join household RPCs
 ```
+
+## How family sharing works (cloud mode)
+
+A **household** is a shared budget space. Creating one makes you its owner and
+gives you an 8-character **invite code** (shown on the **Family** page). Family
+members sign up, choose **Join**, and enter the code. Everyone then sees the
+same accounts, transactions, budgets, and categories across their devices, while
+Postgres Row Level Security guarantees other households can't see your data.
 
 ## License
 
