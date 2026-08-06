@@ -10,8 +10,38 @@ App.state = { user: null, households: [], mode: 'local', unlocked: false }
 /* Lock the app now (requires a PIN to be set). */
 App.lockNow = function () {
   if (!App.config.hasPin()) return
+  App.stopAutoLock()
   App.state.unlocked = false
   App.boot()
+}
+
+/* Auto-lock after a period of inactivity (when enabled + a PIN is set). */
+let _autoLockTimer = null
+const AUTO_LOCK_EVENTS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click']
+function autoLockMs() {
+  const m = App.config.get('autoLockMinutes') || 0
+  return m > 0 ? m * 60000 : 0
+}
+App.resetAutoLock = function () {
+  if (_autoLockTimer) clearTimeout(_autoLockTimer)
+  if (!App.config.hasPin() || !App.state.unlocked || !autoLockMs()) return
+  _autoLockTimer = setTimeout(() => App.lockNow(), autoLockMs())
+}
+App.startAutoLock = function () {
+  App.stopAutoLock()
+  if (!App.config.hasPin() || !autoLockMs()) return
+  const reset = () => App.resetAutoLock()
+  AUTO_LOCK_EVENTS.forEach((ev) => window.addEventListener(ev, reset, { passive: true }))
+  App.state._autoLockReset = reset
+  App.resetAutoLock()
+}
+App.stopAutoLock = function () {
+  if (_autoLockTimer) clearTimeout(_autoLockTimer)
+  _autoLockTimer = null
+  if (App.state._autoLockReset) {
+    AUTO_LOCK_EVENTS.forEach((ev) => window.removeEventListener(ev, App.state._autoLockReset))
+    App.state._autoLockReset = null
+  }
 }
 
 const NAV = [
@@ -300,6 +330,7 @@ function renderShell() {
   App.util.clear(root()).appendChild(shell)
   App.router.mount(outlet, markActive)
   App.router.render()
+  App.startAutoLock()
 }
 
 function markActive(path) {
@@ -314,6 +345,7 @@ function markActive(path) {
 function renderLock() {
   const { el } = App.util
   if (App.state._lockCleanup) App.state._lockCleanup() // drop any prior key listener
+  App.stopAutoLock()
   const pinLength = App.config.get('pinLength') || 4
   let entered = ''
   let busy = false

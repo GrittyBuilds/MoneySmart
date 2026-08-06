@@ -17,6 +17,7 @@ App.config = (function () {
     pinHash: '',
     pinSalt: '',
     pinLength: 0,
+    autoLockMinutes: 0, // 0 = off; otherwise lock after N minutes idle
   }
 
   function read() {

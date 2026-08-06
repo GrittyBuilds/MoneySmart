@@ -35,6 +35,7 @@
   --track: #293656;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   --scrim: rgba(6, 10, 20, 0.66);
+  --bar-bg: rgba(15, 22, 38, 0.9); /* translucent mobile top/bottom bars */
   --radius: 20px;
   --radius-sm: 13px;
 }
@@ -62,6 +63,7 @@
   --track: #E7ECF1;
   --shadow: 0 12px 30px rgba(31, 42, 68, 0.10);
   --scrim: rgba(31, 42, 68, 0.40);
+  --bar-bg: rgba(255, 255, 255, 0.9);
 }
 
 * { box-sizing: border-box; }
@@ -342,6 +344,54 @@ input[type=number] { -moz-appearance: textfield; }
 .report-sub { font-size: 12px; color: var(--faint); }
 @media (max-width: 620px) { .report-filters { grid-template-columns: 1fr; } }
 
+/* Statement (Profit & Loss) */
+.statement { }
+.st-section-title { font-family: var(--font-display); font-weight: 600; color: var(--text); font-size: 0.95rem; margin-bottom: 4px; }
+.st-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--border); font-size: 0.92rem; }
+.st-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.st-amt { font-variant-numeric: tabular-nums; font-weight: 500; white-space: nowrap; }
+.st-total { font-weight: 700; border-bottom: none; border-top: 2px solid var(--border-2); margin-top: 2px; }
+.st-net { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; border-top: 3px solid var(--text); border-bottom: none; margin-top: 8px; padding-top: 12px; }
+.st-amt.pos { color: var(--brand-text); }
+.st-amt.neg { color: var(--danger); }
+
+/* Report table (Cash Flow) */
+.rtable { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.rtable th, .rtable td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+.rtable th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.rtable .num { text-align: right; font-variant-numeric: tabular-nums; }
+.rtable td.pos { color: var(--brand-text); }
+.rtable td.neg { color: var(--danger); }
+.rtable tfoot td { font-weight: 700; border-top: 2px solid var(--border-2); border-bottom: none; }
+
+/* ---- Print / PDF ---- */
+#print-root { display: none; }
+@media print {
+  :root { color-scheme: light; }
+  body { background: #fff !important; padding: 0 !important; }
+  body > *:not(#print-root) { display: none !important; }
+  #print-root { display: block !important; }
+  @page { margin: 16mm; }
+}
+.print-doc { color: #111827; font-family: var(--font-body); }
+.print-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 2px solid #159C6A; padding-bottom: 12px; margin-bottom: 18px; }
+.print-brand { display: flex; align-items: center; gap: 10px; }
+.print-mark { display: inline-flex; }
+.print-mark svg { width: 30px; height: 30px; display: block; }
+.print-word { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; color: #1F2A44; }
+.print-word span { color: #159C6A; }
+.print-meta { text-align: right; font-size: 0.82rem; color: #4b5563; }
+.print-hh { font-weight: 700; font-size: 1rem; color: #111827; }
+.print-title { color: #159C6A; font-weight: 600; }
+.print-h { font-family: var(--font-display); color: #1F2A44; margin: 18px 0 6px; font-size: 1rem; }
+.print-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 0.9rem; }
+.print-table th, .print-table td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #e5e7eb; }
+.print-table th { color: #6b7280; font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em; }
+.print-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.print-table tbody tr:last-child td { border-top: 2px solid #159C6A; }
+.print-net td { border: none !important; border-top: 2px solid #1F2A44 !important; font-size: 1.05rem; padding-top: 10px; }
+.print-foot { margin-top: 26px; padding-top: 10px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 0.78rem; text-align: center; font-family: var(--font-display); }
+
 /* ---- Charts ---- */
 .chart { width: 100%; height: auto; display: block; }
 .chart .grid { stroke: var(--border); stroke-width: 1; }
@@ -430,13 +480,13 @@ input[type=number] { -moz-appearance: textfield; }
   .topbar {
     display: flex; align-items: center; justify-content: space-between;
     position: sticky; top: 0; z-index: 30; padding: 11px 15px;
-    background: rgba(11, 17, 32, .9); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
+    background: var(--bar-bg); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
   }
   .topbar-switch { margin-bottom: 14px; }
   .bottom-nav {
     display: grid; grid-template-columns: repeat(5, 1fr);
     position: fixed; inset: auto 0 0 0; z-index: 40;
-    background: rgba(11, 17, 32, .95); backdrop-filter: blur(8px); border-top: 1px solid var(--border);
+    background: var(--bar-bg); backdrop-filter: blur(8px); border-top: 1px solid var(--border);
     padding-bottom: env(safe-area-inset-bottom);
   }
   .bottom-nav a { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 0; color: var(--faint); font-size: 10px; font-weight: 600; text-decoration: none; }

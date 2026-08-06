@@ -31,9 +31,28 @@ App.pages.settings = (function () {
     const ui = App.ui
     const on = App.config.hasPin()
 
+    const autoOptions = [
+      { value: 0, label: 'Off' },
+      { value: 1, label: '1 min' },
+      { value: 5, label: '5 min' },
+      { value: 15, label: '15 min' },
+      { value: 30, label: '30 min' },
+    ]
+    const autoSel = el('select', { class: 'input', style: { maxWidth: '160px' } }, autoOptions.map((o) =>
+      el('option', { value: String(o.value), text: o.label, selected: (App.config.get('autoLockMinutes') || 0) === o.value })))
+    autoSel.addEventListener('change', () => {
+      App.config.write({ autoLockMinutes: Number(autoSel.value) })
+      App.startAutoLock()
+      App.ui.toast('Auto-lock updated', 'success')
+    })
+
     const body = on
       ? el('div', {}, [
           el('div', { class: 'notice ok', style: { marginBottom: '12px' }, text: 'App lock is on — a PIN is required each time MoneySmart opens on this device.' }),
+          el('div', { class: 'field' }, [
+            el('label', { class: 'label', text: 'Auto-lock after inactivity' }),
+            autoSel,
+          ]),
           el('div', { class: 'row-end', style: { justifyContent: 'flex-start', flexWrap: 'wrap' } }, [
             el('button', { class: 'btn ghost', onClick: () => openPin('change') }, [ui.icon('lock', 16), 'Change PIN']),
             el('button', { class: 'btn ghost', onClick: () => App.lockNow() }, [ui.icon('lock', 16), 'Lock now']),

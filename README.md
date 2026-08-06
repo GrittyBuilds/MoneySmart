@@ -23,9 +23,13 @@ devices and share one budget with your family.
   the splits add up. Splits flow through the dashboard, budgets, and reports.
 - **🔖 Tags** — create colored tags and attach several to any transaction, then
   filter and report on them.
-- **📈 Reports** — slice spending or income by **category, subcategory, tag,
-  vendor, account, or month** over any date range, see a ranked breakdown, and
-  **export to CSV** (summary or full transactions).
+- **📈 Reports & printable statements** — three report types over any date
+  range: a **Breakdown** (group by category, subcategory, tag, vendor, account,
+  or month), a **Profit & Loss** statement (income vs. expenses by category),
+  and a **Cash Flow** statement (inflows/outflows/net by month). Every view can
+  be **printed to a branded PDF** (Print / PDF button) or **exported to CSV**.
+- **🔐 Auto-lock** — optionally lock the app after 1–30 minutes of inactivity
+  (Settings → Security), on top of the PIN lock screen.
 - **🏷️ Categories & subcategories** — add and remove your own categories, and
   nest subcategories under them. Deleting a category also removes its
   subcategories. The dashboard donut rolls spending up to the top-level

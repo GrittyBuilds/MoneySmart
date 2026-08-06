@@ -45,7 +45,7 @@ App.pages.family = (function () {
       el('div', { class: 'list' }, s.data.members.map((m) =>
         el('div', { class: 'row' }, [
           el('div', { class: 'row-main' }, [
-            el('span', { class: 'avatar', style: { background: 'var(--brand-soft)', color: 'var(--brand-text)', borderRadius: '50%' }, text: ((m.display_name || '?')[0] || '?').toUpperCase() }),
+            el('span', { class: 'avatar', style: { background: 'rgba(255,138,91,0.16)', color: 'var(--coral)', borderRadius: '50%' }, text: ((m.display_name || '?')[0] || '?').toUpperCase() }),
             el('div', {}, [
               el('div', { class: 'row-title', text: (m.display_name || 'Member') }),
               el('div', { class: 'row-sub', style: { textTransform: 'capitalize' }, text: m.role }),
