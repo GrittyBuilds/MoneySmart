@@ -14,14 +14,84 @@ App.pages.settings = (function () {
     const isCloud = App.store.getBackend().isCloud
 
     return el('div', {}, [
-      ui.pageHeader('Settings', 'Appearance, currency, backups, and syncing.'),
+      ui.pageHeader('Settings', 'Appearance, security, currency, backups, and syncing.'),
       el('div', { class: 'stack' }, [
         appearanceCard(cfg),
+        securityCard(),
         currencyCard(cfg),
         backupCard(),
         isCloud ? cloudConnectedCard(cfg) : localCard(cfg),
       ]),
     ])
+  }
+
+  /* ---------- Security / app lock ---------- */
+  function securityCard() {
+    const { el } = App.util
+    const ui = App.ui
+    const on = App.config.hasPin()
+
+    const body = on
+      ? el('div', {}, [
+          el('div', { class: 'notice ok', style: { marginBottom: '12px' }, text: 'App lock is on — a PIN is required each time MoneySmart opens on this device.' }),
+          el('div', { class: 'row-end', style: { justifyContent: 'flex-start', flexWrap: 'wrap' } }, [
+            el('button', { class: 'btn ghost', onClick: () => openPin('change') }, [ui.icon('lock', 16), 'Change PIN']),
+            el('button', { class: 'btn ghost', onClick: () => App.lockNow() }, [ui.icon('lock', 16), 'Lock now']),
+            el('button', { class: 'btn ghost', onClick: turnOff }, [ui.icon('unlock', 16), 'Turn off']),
+          ]),
+        ])
+      : el('div', {}, [
+          el('p', { class: 'muted', style: { marginBottom: '12px' }, text: 'Set a PIN to keep your budget private on this device. You’ll be asked for it whenever MoneySmart opens.' }),
+          el('button', { class: 'btn primary', onClick: () => openPin('set') }, [ui.icon('lock', 16), 'Set a PIN']),
+        ])
+
+    return el('div', { class: 'card pad' }, [
+      el('div', { class: 'section-title' }, [ui.icon('lock', 18), 'Security & app lock']),
+      body,
+      el('p', { class: 'faint', style: { fontSize: '12px', marginTop: '12px' }, text: 'The PIN is stored hashed on this device. It’s a privacy lock, not full encryption — clearing browser data removes it.' }),
+    ])
+  }
+
+  async function turnOff() {
+    if (!(await App.ui.confirm('Turn off the app lock? Anyone with this device will be able to open MoneySmart.', { danger: false, okLabel: 'Turn off' }))) return
+    App.config.clearPin()
+    App.ui.toast('App lock turned off', 'success')
+    App.rerender()
+  }
+
+  function openPin(mode) {
+    const { el } = App.util
+    const ui = App.ui
+    const digits = (v) => v.replace(/\D/g, '').slice(0, 6)
+
+    const pin1 = el('input', { class: 'input', type: 'password', inputmode: 'numeric', autocomplete: 'off', placeholder: '4–6 digits' })
+    pin1.setAttribute('autofocus', '')
+    const pin2 = el('input', { class: 'input', type: 'password', inputmode: 'numeric', autocomplete: 'off', placeholder: 'Re-enter PIN' })
+    ;[pin1, pin2].forEach((i) => i.addEventListener('input', () => { i.value = digits(i.value) }))
+    const err = el('div', {})
+    const submitBtn = el('button', { class: 'btn primary block', type: 'submit', text: mode === 'change' ? 'Update PIN' : 'Set PIN' })
+
+    const form = el('form', {
+      onSubmit: async (e) => {
+        e.preventDefault()
+        ui.clear(err)
+        const a = pin1.value
+        const b = pin2.value
+        if (a.length < 4) { err.appendChild(el('div', { class: 'notice error', text: 'PIN must be at least 4 digits.' })); return }
+        if (a !== b) { err.appendChild(el('div', { class: 'notice error', text: 'The two PINs don’t match.' })); return }
+        submitBtn.disabled = true
+        await App.config.setPin(a)
+        m.close()
+        App.ui.toast(mode === 'change' ? 'PIN updated' : 'App lock enabled', 'success')
+        App.rerender()
+      },
+    }, [
+      el('div', { class: 'field' }, [el('label', { class: 'label', text: 'New PIN' }), pin1]),
+      el('div', { class: 'field' }, [el('label', { class: 'label', text: 'Confirm PIN' }), pin2]),
+      err,
+      submitBtn,
+    ])
+    const m = ui.modal({ title: mode === 'change' ? 'Change PIN' : 'Set a PIN', body: form })
   }
 
   /* ---------- Appearance / theme ---------- */

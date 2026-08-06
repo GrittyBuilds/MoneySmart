@@ -5,7 +5,14 @@
  * ========================================================================== */
 window.App = window.App || {}
 
-App.state = { user: null, households: [], mode: 'local' }
+App.state = { user: null, households: [], mode: 'local', unlocked: false }
+
+/* Lock the app now (requires a PIN to be set). */
+App.lockNow = function () {
+  if (!App.config.hasPin()) return
+  App.state.unlocked = false
+  App.boot()
+}
 
 const NAV = [
   { path: '/', label: 'Dashboard', icon: 'dashboard' },
@@ -36,7 +43,7 @@ App.applyTheme = function () {
   document.documentElement.setAttribute('data-theme', resolved)
   App.state.resolvedTheme = resolved
   const meta = App.util.$('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', resolved === 'light' ? '#f1f5f9' : '#0b1120')
+  if (meta) meta.setAttribute('content', resolved === 'light' ? '#F5F7FA' : '#0f1626')
 }
 
 /* Flip between explicit light/dark (used by the quick toggle button). */
@@ -101,6 +108,13 @@ App.boot = async function () {
   App.util.setCurrency(App.config.get('currency'))
   App.applyTheme()
   App.ui.closeModal()
+
+  // App lock: gate everything behind the PIN until unlocked this session.
+  if (App.config.hasPin() && !App.state.unlocked) {
+    renderLock()
+    return
+  }
+
   App.util.clear(root()).appendChild(App.ui.spinner('Loading MoneySmart…'))
 
   if (App.config.isCloud()) {
@@ -149,10 +163,10 @@ async function bootCloud() {
 function brand() {
   const { el } = App.util
   return el('div', { class: 'brand' }, [
-    el('div', { class: 'brand-mark', text: '$' }),
+    App.ui.logoMark(36),
     el('div', {}, [
-      el('div', { class: 'brand-name', text: 'MoneySmart' }),
-      el('div', { class: 'brand-sub', text: 'Family budgeting' }),
+      App.ui.wordmark('1.02rem'),
+      el('div', { class: 'brand-sub', text: 'Every dollar has a home.' }),
     ]),
   ])
 }
@@ -215,6 +229,13 @@ function themeIconButton() {
   return el('button', { class: 'icon-btn theme-toggle', dataset: { iconSize: '20' }, 'aria-label': 'Toggle light or dark theme', onClick: () => App.toggleTheme() }, [App.ui.icon(isLight ? 'moon' : 'sun', 20)])
 }
 
+function lockNavButton() {
+  if (!App.config.hasPin()) return null
+  return App.util.el('button', { class: 'nav-btn', onClick: () => App.lockNow() }, [
+    App.ui.icon('lock', 20), App.util.el('span', { text: 'Lock now' }),
+  ])
+}
+
 function sideFoot() {
   const { el } = App.util
   const themeBtn = themeNavButton()
@@ -222,6 +243,7 @@ function sideFoot() {
     return el('div', { class: 'side-foot' }, [
       el('div', { class: 'who', text: (App.state.user && App.state.user.email) || '' }),
       themeBtn,
+      lockNavButton(),
       el('button', {
         class: 'nav-btn',
         onClick: async () => { await App.CloudBackend.signOut(); await App.boot() },
@@ -230,6 +252,7 @@ function sideFoot() {
   }
   return el('div', { class: 'side-foot' }, [
     themeBtn,
+    lockNavButton(),
     el('a', { href: '#/settings', class: 'nav-btn', style: { color: 'var(--brand)', textDecoration: 'none' } }, [
       App.ui.icon('cloud', 20), el('span', { text: 'Connect Supabase' }),
     ]),
@@ -250,6 +273,9 @@ function renderShell() {
 
   const topbarRight = el('div', { style: { display: 'flex', gap: '4px' } }, [
     themeIconButton(),
+    App.config.hasPin()
+      ? el('button', { class: 'icon-btn', 'aria-label': 'Lock now', onClick: () => App.lockNow() }, [App.ui.icon('lock', 20)])
+      : null,
     el('a', { href: '#/family', class: 'icon-btn', 'aria-label': 'Family' }, [App.ui.icon('users', 20)]),
     el('a', { href: '#/settings', class: 'icon-btn', 'aria-label': 'Settings' }, [App.ui.icon('settings', 20)]),
     App.state.mode === 'cloud'
@@ -280,6 +306,89 @@ function markActive(path) {
   App.util.$$('[data-route]').forEach((a) => {
     a.classList.toggle('active', a.dataset.route === path)
   })
+}
+
+/* -------------------------------------------------------------------------- */
+/* Lock screen (device PIN)                                                    */
+/* -------------------------------------------------------------------------- */
+function renderLock() {
+  const { el } = App.util
+  if (App.state._lockCleanup) App.state._lockCleanup() // drop any prior key listener
+  const pinLength = App.config.get('pinLength') || 4
+  let entered = ''
+  let busy = false
+
+  const dots = el('div', { class: 'pin-dots' })
+  const errorEl = el('div', { class: 'pin-error' })
+
+  function paintDots() {
+    App.util.clear(dots)
+    for (let i = 0; i < pinLength; i++) {
+      dots.appendChild(el('span', { class: 'pin-dot' + (i < entered.length ? ' on' : '') }))
+    }
+  }
+  paintDots()
+
+  async function tryUnlock() {
+    busy = true
+    const ok = await App.config.verifyPin(entered)
+    if (ok) {
+      cleanup()
+      App.state.unlocked = true
+      App.boot()
+    } else {
+      busy = false
+      entered = ''
+      paintDots()
+      card.classList.add('shake')
+      errorEl.textContent = 'Wrong PIN — try again'
+      setTimeout(() => card.classList.remove('shake'), 450)
+    }
+  }
+
+  function press(d) {
+    if (busy || entered.length >= pinLength) return
+    entered += d
+    errorEl.textContent = ''
+    paintDots()
+    if (entered.length === pinLength) tryUnlock()
+  }
+  function backspace() {
+    if (busy) return
+    entered = entered.slice(0, -1)
+    paintDots()
+  }
+
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫']
+  const keypad = el('div', { class: 'keypad' }, keys.map((k) => {
+    if (k === '') return el('span', {})
+    if (k === '⌫') return el('button', { type: 'button', class: 'key key-fn', 'aria-label': 'Delete', onClick: backspace }, [App.ui.icon('backspace', 22)])
+    return el('button', { type: 'button', class: 'key', text: k, onClick: () => press(k) })
+  }))
+
+  function onKey(e) {
+    if (e.key >= '0' && e.key <= '9') press(e.key)
+    else if (e.key === 'Backspace') backspace()
+  }
+  window.addEventListener('keydown', onKey)
+  function cleanup() { window.removeEventListener('keydown', onKey) }
+  App.state._lockCleanup = cleanup
+
+  const card = el('div', { class: 'lock-card' }, [
+    App.ui.logoMark(60),
+    App.ui.wordmark('1.6rem'),
+    el('p', { class: 'lock-sub', text: 'Enter your PIN to unlock' }),
+    dots,
+    errorEl,
+    keypad,
+  ])
+
+  App.util.clear(root()).appendChild(
+    el('div', { class: 'lock-screen' }, [
+      card,
+      el('p', { class: 'lock-tag', text: 'Every dollar has a home.' }),
+    ]),
+  )
 }
 
 /* -------------------------------------------------------------------------- */
@@ -339,8 +448,8 @@ function renderAuth() {
 
   const card = el('div', { class: 'auth-card' }, [
     el('div', { class: 'auth-head' }, [
-      el('div', { class: 'brand-mark', text: '$' }),
-      el('h1', { text: 'MoneySmart' }),
+      App.ui.logoMark(58),
+      App.ui.wordmark('1.7rem'),
       el('p', { class: 'muted', text: 'Sign in to your family budget.' }),
     ]),
     el('div', { class: 'card pad' }, [form]),
@@ -436,7 +545,7 @@ function renderCloudError(err) {
   const { el } = App.util
   const card = el('div', { class: 'auth-card' }, [
     el('div', { class: 'auth-head' }, [
-      el('div', { class: 'brand-mark', text: '$' }),
+      App.ui.logoMark(52),
       el('h1', { text: 'Connection problem' }),
     ]),
     el('div', { class: 'card pad' }, [

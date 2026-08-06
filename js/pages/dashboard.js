@@ -65,13 +65,13 @@ App.pages.dashboard = (function () {
       App.charts.bars({
         labels,
         series: [
-          { name: 'Income', color: '#10b981', values: income },
-          { name: 'Expenses', color: '#f43f5e', values: expense },
+          { name: 'Income', color: '#159C6A', values: income },
+          { name: 'Expenses', color: '#E5556E', values: expense },
         ],
       }),
       el('div', { class: 'row-end', style: { gap: '16px', marginTop: '6px' } }, [
-        legendDot('#10b981', 'Income'),
-        legendDot('#f43f5e', 'Expenses'),
+        legendDot('#159C6A', 'Income'),
+        legendDot('#E5556E', 'Expenses'),
       ]),
     ])
 

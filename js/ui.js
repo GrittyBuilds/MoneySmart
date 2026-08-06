@@ -33,6 +33,40 @@ App.ui = (function () {
     upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/>',
     tag: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/>',
     report: '<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/>',
+    lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    unlock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+    backspace: '<path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><path d="M18 9l-6 6M12 9l6 6"/>',
+  }
+
+  // The MoneySmart coin-with-growth-arc mark. Unique gradient ids per call so
+  // multiple inline SVGs on one page don't collide.
+  let markSeq = 0
+  function logoMark(size = 40, { rounded = true } = {}) {
+    const n = ++markSeq
+    const rx = rounded ? 118 : 0
+    const svg =
+      `<svg viewBox="0 0 512 512" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<defs>` +
+      `<linearGradient id="msbg${n}" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2FBF87"/><stop offset="1" stop-color="#159C6A"/></linearGradient>` +
+      `<linearGradient id="msar${n}" x1="150" y1="330" x2="360" y2="170" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#159C6A"/><stop offset="1" stop-color="#2FBF87"/></linearGradient>` +
+      `</defs>` +
+      `<rect width="512" height="512" rx="${rx}" fill="url(#msbg${n})"/>` +
+      `<circle cx="256" cy="256" r="156" fill="#fff"/>` +
+      `<path d="M148 306 C 186 306, 206 322, 236 306 S 300 236, 336 188" fill="none" stroke="url(#msar${n})" stroke-width="30" stroke-linecap="round"/>` +
+      `<path d="M300 176 L 352 168 L 348 220" fill="none" stroke="url(#msar${n})" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<circle cx="176" cy="252" r="12" fill="#FFC94D"/>` +
+      `<circle cx="228" cy="238" r="10" fill="#FF8A5B"/>` +
+      `</svg>`
+    const span = el('span', { class: 'logo-mark' })
+    span.innerHTML = svg
+    return span
+  }
+
+  // "MoneySmart" wordmark — Money in text color, Smart in brand green.
+  function wordmark(size = '1rem', { reversed = false } = {}) {
+    const w = el('span', { class: 'wordmark' + (reversed ? ' reversed' : ''), style: { fontSize: size } })
+    w.innerHTML = '<span class="wm-money">Money</span><span class="wm-smart">Smart</span>'
+    return w
   }
 
   function icon(name, size = 20) {
@@ -203,7 +237,7 @@ App.ui = (function () {
   }
 
   return {
-    icon, modal, closeModal, confirm, toast, spinner, empty, pageHeader, clear,
+    icon, logoMark, wordmark, modal, closeModal, confirm, toast, spinner, empty, pageHeader, clear,
     moneyField, statCard, monthPicker, catBadge,
   }
 })()

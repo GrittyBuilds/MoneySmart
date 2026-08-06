@@ -107,6 +107,12 @@ App.util = (function () {
     return Math.random().toString(36).slice(2, 10)
   }
 
+  /** SHA-256 hex digest of a string (used to store the app-lock PIN hashed). */
+  async function sha256(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+  }
+
   function download(filename, text, mime) {
     const blob = new Blob([text], { type: mime || 'text/plain' })
     const url = URL.createObjectURL(blob)
@@ -140,6 +146,6 @@ App.util = (function () {
     money, moneyCompact, round2, setCurrency, getCurrency,
     parseISO, toISO, todayISO, startOfMonth, endOfMonth, addMonths,
     monthKey, sameMonth, monthLabel, prettyDate, shortDate,
-    uid, inviteCode, download, downloadJSON, toCSV, downloadCSV,
+    uid, inviteCode, sha256, download, downloadJSON, toCSV, downloadCSV,
   }
 })()

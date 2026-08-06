@@ -41,8 +41,14 @@ devices and share one budget with your family.
 - **💾 Backup & restore** — export a JSON copy of all your data from **Settings**
   with one click, and import it later to restore it on this device (or add it
   into a cloud household).
+- **🔒 App lock** — set a device PIN to keep your budget private. A branded
+  lock screen (keypad) guards the app on every open; the PIN is stored hashed
+  in the browser. Manage it under **Settings → Security & app lock**, and lock
+  on demand from the sidebar or top bar.
 - **🌗 Light & dark themes** — pick Light, Dark, or follow your device setting.
-  A quick toggle lives in the sidebar (and the mobile top bar).
+  A quick toggle lives in the sidebar (and the mobile top bar). Styled to the
+  MoneySmart brand — Grow Green on Cloud/white in light, bright green on Ink
+  Navy in dark, with the Poppins + Inter type system.
 - **📱 Responsive** — a mobile-first layout with a desktop sidebar and a mobile
   bottom tab bar. Add it to your home screen (it ships a web manifest).
 

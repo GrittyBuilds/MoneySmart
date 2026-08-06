@@ -19,7 +19,7 @@ App.LocalBackend = (function () {
     { name: 'Health', kind: 'expense', color: '#14b8a6' },
     { name: 'Kids', kind: 'expense', color: '#f97316' },
     { name: 'Savings', kind: 'expense', color: '#06b6d4' },
-    { name: 'Salary', kind: 'income', color: '#10b981' },
+    { name: 'Salary', kind: 'income', color: '#159C6A' },
     { name: 'Other Income', kind: 'income', color: '#84cc16' },
   ]
 

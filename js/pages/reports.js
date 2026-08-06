@@ -100,7 +100,7 @@ App.pages.reports = (function () {
         else ids.forEach((id) => { const tg = tags.get(id); add(tg.id, tg.name, tg.color, t.amount) })
       } else if (groupBy === 'vendor') {
         const v = (t.vendor || '').trim()
-        add(v ? 'v:' + v.toLowerCase() : 'novendor', v || 'No vendor', '#10b981', t.amount)
+        add(v ? 'v:' + v.toLowerCase() : 'novendor', v || 'No vendor', '#159C6A', t.amount)
       } else if (groupBy === 'account') {
         const a = t.account_id ? accts.get(t.account_id) : null
         add(a ? a.id : 'noacct', a ? a.name : 'No account', '#3b82f6', t.amount)

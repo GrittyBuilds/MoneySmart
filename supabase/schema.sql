@@ -49,7 +49,7 @@ create table if not exists public.categories (
   household_id uuid not null references public.households (id) on delete cascade,
   name         text not null,
   kind         text not null default 'expense',   -- expense | income
-  color        text not null default '#10b981',
+  color        text not null default '#159C6A',
   icon         text not null default 'tag',
   -- Self-reference for subcategories; deleting a parent removes its children.
   parent_id    uuid references public.categories (id) on delete cascade,
@@ -219,7 +219,7 @@ begin
     (hid, 'Health',         'expense', '#14b8a6', 'heart-pulse'),
     (hid, 'Kids',           'expense', '#f97316', 'baby'),
     (hid, 'Savings',        'expense', '#06b6d4', 'piggy-bank'),
-    (hid, 'Salary',         'income',  '#10b981', 'wallet'),
+    (hid, 'Salary',         'income',  '#159C6A', 'wallet'),
     (hid, 'Other Income',   'income',  '#84cc16', 'plus');
 
   return hid;

@@ -13,6 +13,10 @@ App.config = (function () {
     theme: 'system', // 'system' | 'light' | 'dark'
     supabaseUrl: '',
     supabaseKey: '',
+    // App lock (device-local privacy PIN). pinHash = sha256(salt + pin).
+    pinHash: '',
+    pinSalt: '',
+    pinLength: 0,
   }
 
   function read() {
@@ -34,5 +38,25 @@ App.config = (function () {
   const hasSupabase = () => Boolean(read().supabaseUrl && read().supabaseKey)
   const isCloud = () => read().mode === 'cloud' && hasSupabase()
 
-  return { read, write, get, all, hasSupabase, isCloud, DEFAULTS }
+  /* ---- App lock (PIN) ---- */
+  const hasPin = () => Boolean(read().pinHash)
+
+  async function setPin(pin) {
+    const salt = App.util.uid()
+    const pinHash = await App.util.sha256(salt + pin)
+    write({ pinHash, pinSalt: salt, pinLength: String(pin).length })
+  }
+
+  async function verifyPin(pin) {
+    const s = read()
+    if (!s.pinHash) return true
+    const h = await App.util.sha256(s.pinSalt + pin)
+    return h === s.pinHash
+  }
+
+  function clearPin() {
+    write({ pinHash: '', pinSalt: '', pinLength: 0 })
+  }
+
+  return { read, write, get, all, hasSupabase, isCloud, hasPin, setPin, verifyPin, clearPin, DEFAULTS }
 })()

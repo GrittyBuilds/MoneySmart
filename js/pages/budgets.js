@@ -72,7 +72,7 @@ App.pages.budgets = (function () {
       const has = budget > 0
       const pct = has ? Math.min(100, (spent / budget) * 100) : 0
       const over = has && spent > budget
-      const barColor = over ? '#f43f5e' : pct > 80 ? '#f59e0b' : cat.color
+      const barColor = over ? '#E5556E' : pct > 80 ? '#F0A93A' : cat.color
 
       return el('div', { class: 'card budget-row' + (depth ? ' sub' : '') }, [
         el('div', { class: 'budget-top' }, [
