@@ -15,12 +15,23 @@ devices and share one budget with your family.
 - **📊 Dashboard** — total balance, monthly income / expenses / net, a
   spending-by-category donut, a 6-month income-vs-expense bar chart, and recent
   activity. Charts are hand-drawn SVG — no chart library.
-- **💸 Transactions** — add, edit, delete, search, and filter income & expenses.
-  Each has a **description** and a **vendor** line (with autocomplete from past
-  vendors).
+- **💸 Transactions** — add, edit, delete, search, and filter income, expenses &
+  transfers. Each has a **description** and a **vendor** line (with autocomplete
+  from past vendors). Pick a category with a **type-ahead search box** — start
+  typing and matching categories/subcategories filter instantly.
+- **🔁 Transfers** — move money between accounts, including **paying off a credit
+  card**. Transfers lower the source balance and the card's owed amount, and are
+  never counted as income or expense.
+- **🔂 Recurring transactions** — tick **Repeat** when adding a transaction
+  (weekly, every two weeks, monthly, or yearly) or manage rules from the
+  **Recurring** panel on the Transactions page. Due transactions are created
+  automatically each time the app opens.
 - **✂️ Split transactions** — split one transaction's amount across multiple
   categories/subcategories; the editor keeps a running total and only saves when
   the splits add up. Splits flow through the dashboard, budgets, and reports.
+- **➕ Quick add** — a central **+** button in the mobile bottom bar (and the
+  desktop sidebar) opens a menu to add a transaction, transfer, account,
+  category, or tag from anywhere.
 - **🔖 Tags** — create colored tags and attach several to any transaction, then
   filter and report on them.
 - **📈 Reports & printable statements** — three report types over any date
@@ -30,15 +41,21 @@ devices and share one budget with your family.
   be **printed to a branded PDF** (Print / PDF button) or **exported to CSV**.
 - **🔐 Auto-lock** — optionally lock the app after 1–30 minutes of inactivity
   (Settings → Security), on top of the PIN lock screen.
-- **🏷️ Categories & subcategories** — add and remove your own categories, and
-  nest subcategories under them. Deleting a category also removes its
+- **🏷️ Categories & subcategories** — ships with a thoughtful set of sample
+  top-level categories, each with starter subcategories. Add and remove your
+  own, and nest subcategories under them. Deleting a category also removes its
   subcategories. The dashboard donut rolls spending up to the top-level
   category for a clean overview.
 - **🎯 Budgets by category** — set a monthly limit per category (or
   subcategory) with progress bars that turn amber near the limit and red when
-  exceeded.
-- **🏦 Accounts** — checking, savings, cash, and credit balances that update
-  automatically from your transactions.
+  exceeded. **Subcategory budgets and spending roll up into their parent**, so a
+  top-level category always reflects the whole group.
+- **🏦 Accounts & net worth** — checking, savings, cash, credit card, and loan
+  balances that update automatically from your transactions. **Credit cards and
+  loans are treated as debts**: their balance is the amount owed and counts
+  negatively toward your net worth, and spending on a card increases what you
+  owe. **Tap an account** to open it and see all of its transactions. The
+  Accounts screen stacks cleanly on mobile with no sideways scrolling.
 - **👨‍👩‍👧 Family sharing** *(cloud mode)* — invite family members with a code so
   everyone shares one budget, each with their own login. Row Level Security
   keeps every household's data private.

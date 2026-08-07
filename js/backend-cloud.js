@@ -48,6 +48,33 @@ App.CloudBackend = (function () {
       .filter((s) => s.amount > 0)
   }
 
+  function sanitizeTemplate(t) {
+    t = t || {}
+    return {
+      kind: t.kind || 'expense',
+      amount: round2(t.amount),
+      account_id: t.account_id || null,
+      transfer_account_id: t.transfer_account_id || null,
+      category_id: t.category_id || null,
+      description: t.description || null,
+      vendor: t.vendor || null,
+      tag_ids: Array.isArray(t.tag_ids) ? t.tag_ids : [],
+      splits: normalizeSplits(t.splits),
+    }
+  }
+
+  function advanceDate(iso, frequency) {
+    const d = App.util.parseISO(iso)
+    switch (frequency) {
+      case 'weekly': d.setDate(d.getDate() + 7); break
+      case 'biweekly': d.setDate(d.getDate() + 14); break
+      case 'yearly': d.setFullYear(d.getFullYear() + 1); break
+      case 'monthly':
+      default: d.setMonth(d.getMonth() + 1); break
+    }
+    return App.util.toISO(d)
+  }
+
   return {
     id: 'cloud',
     isCloud: true,
@@ -256,13 +283,14 @@ App.CloudBackend = (function () {
       const { error } = await need().from('transactions').insert({
         household_id: currentHouseholdId,
         account_id: input.account_id || null,
-        category_id: input.category_id || null,
+        transfer_account_id: input.transfer_account_id || null,
+        category_id: input.kind === 'transfer' ? null : input.category_id || null,
         kind: input.kind,
         amount: round2(input.amount),
         description: input.description || null,
         vendor: input.vendor || null,
         tag_ids: Array.isArray(input.tag_ids) ? input.tag_ids : [],
-        splits: normalizeSplits(input.splits),
+        splits: input.kind === 'transfer' ? [] : normalizeSplits(input.splits),
         occurred_on: input.occurred_on,
       })
       if (error) throw error
@@ -322,14 +350,89 @@ App.CloudBackend = (function () {
       }
     },
 
+    /* ---- Recurring transactions ---- */
+    async listRecurring() {
+      return rows(
+        need()
+          .from('recurring')
+          .select('*')
+          .eq('household_id', currentHouseholdId)
+          .order('next_on', { ascending: true }),
+      )
+    },
+    async addRecurring(input) {
+      const { error } = await need().from('recurring').insert({
+        household_id: currentHouseholdId,
+        template: sanitizeTemplate(input.template),
+        frequency: input.frequency || 'monthly',
+        next_on: input.next_on,
+        end_on: input.end_on || null,
+        active: input.active !== false,
+      })
+      if (error) throw error
+    },
+    async updateRecurring(id, patch) {
+      const next = { ...patch }
+      if (next.template) next.template = sanitizeTemplate(next.template)
+      const { error } = await need().from('recurring').update(next).eq('id', id)
+      if (error) throw error
+    },
+    async deleteRecurring(id) {
+      const { error } = await need().from('recurring').delete().eq('id', id)
+      if (error) throw error
+    },
+    /** Materialize any recurring rules that have come due (up to today). */
+    async runDueRecurring() {
+      if (!currentHouseholdId) return 0
+      const today = App.util.todayISO()
+      const list = await rows(
+        need().from('recurring').select('*').eq('household_id', currentHouseholdId).eq('active', true).lte('next_on', today),
+      )
+      let created = 0
+      for (const r of list) {
+        const toInsert = []
+        let next = r.next_on
+        let guard = 0
+        while (next && next <= today && (!r.end_on || next <= r.end_on) && guard < 500) {
+          const tpl = r.template || {}
+          toInsert.push({
+            household_id: currentHouseholdId,
+            account_id: tpl.account_id || null,
+            transfer_account_id: tpl.transfer_account_id || null,
+            category_id: tpl.kind === 'transfer' ? null : tpl.category_id || null,
+            kind: tpl.kind,
+            amount: round2(tpl.amount),
+            description: tpl.description || null,
+            vendor: tpl.vendor || null,
+            tag_ids: Array.isArray(tpl.tag_ids) ? tpl.tag_ids : [],
+            splits: tpl.kind === 'transfer' ? [] : normalizeSplits(tpl.splits),
+            occurred_on: next,
+            recurring_id: r.id,
+          })
+          next = advanceDate(next, r.frequency)
+          guard++
+        }
+        if (toInsert.length) {
+          const { error } = await need().from('transactions').insert(toInsert)
+          if (error) throw error
+          created += toInsert.length
+          const patch = { next_on: next }
+          if (r.end_on && next > r.end_on) patch.active = false
+          await need().from('recurring').update(patch).eq('id', r.id)
+        }
+      }
+      return created
+    },
+
     async exportAll() {
-      const [household, categories, tags, accounts, transactions, budgets] = await Promise.all([
+      const [household, categories, tags, accounts, transactions, budgets, recurring] = await Promise.all([
         this.getHousehold(),
         this.listCategories(),
         this.listTags(),
         this.listAccounts(),
         this.listTransactions(),
         rows(need().from('budgets').select('*').eq('household_id', currentHouseholdId)),
+        this.listRecurring().catch(() => []),
       ])
       return {
         app: 'moneysmart',
@@ -341,6 +444,7 @@ App.CloudBackend = (function () {
         accounts,
         transactions,
         budgets,
+        recurring,
       }
     },
 
@@ -429,6 +533,7 @@ App.CloudBackend = (function () {
       const txPayload = (dump.transactions || []).map((t) => ({
         household_id: hid,
         account_id: t.account_id ? acctIdMap[t.account_id] || null : null,
+        transfer_account_id: t.transfer_account_id ? acctIdMap[t.transfer_account_id] || null : null,
         category_id: t.category_id ? catIdMap[t.category_id] || null : null,
         kind: t.kind,
         amount: t.amount,

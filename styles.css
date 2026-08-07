@@ -252,10 +252,12 @@ input[type=number] { -moz-appearance: textfield; }
 .progress { height: 8px; border-radius: 99px; background: var(--track); overflow: hidden; }
 .progress > span { display: block; height: 100%; border-radius: 99px; transition: width .3s; }
 .budget-row { padding: 15px; }
-.budget-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
-.budget-cat { display: flex; align-items: center; gap: 9px; font-weight: 600; }
+.budget-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+.budget-cat { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 9px; font-weight: 600; min-width: 0; flex: 1; }
 .dot { width: 11px; height: 11px; border-radius: 50%; }
-.budget-nums { color: var(--muted); font-size: 0.85rem; }
+.budget-nums { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+.budget-row.sub { min-width: 0; }
+.rollup-tag { flex-basis: 100%; }
 .budget-nums .of { color: var(--faint); }
 .budget-note { font-size: 12px; margin-top: 7px; color: var(--faint); }
 .budget-note.over { color: var(--danger); }
@@ -471,6 +473,68 @@ input[type=number] { -moz-appearance: textfield; }
 .link-btn { background: none; border: none; color: var(--brand); font-weight: 600; padding: 0; }
 .steps { padding-left: 18px; color: var(--muted); font-size: 0.88rem; line-height: 1.6; }
 .steps code, code.inline { background: var(--bg-2); padding: 1px 6px; border-radius: 6px; color: var(--brand-text); font-size: 0.85em; }
+
+/* ---- Segmented toggle: transfer variant ---- */
+.segment button.on.transfer { background: #6366f1; color: #fff; }
+
+/* ---- Searchable category combobox ---- */
+.combo { position: relative; }
+.combo-list {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 50;
+  background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow); max-height: 240px; overflow-y: auto; padding: 4px;
+}
+.combo-item {
+  display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px;
+  font-size: 0.88rem; color: var(--text); cursor: pointer;
+}
+.combo-item:hover, .combo-item.active { background: var(--surface-2); }
+.combo-item.sel { color: var(--brand-text); font-weight: 600; }
+.combo-item .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.combo-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combo-name.sub { color: var(--muted); }
+.combo-empty { padding: 10px; font-size: 0.85rem; color: var(--faint); text-align: center; }
+
+/* ---- Accounts (list + detail) ---- */
+.account-list { display: flex; flex-direction: column; gap: 10px; }
+.account-card {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 14px 15px; text-align: left;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  color: var(--text); transition: background .15s, border-color .15s;
+}
+.account-card:hover { background: var(--surface-2); border-color: var(--border-2); }
+.account-card-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.account-card-right .amount { font-size: 1rem; }
+.account-card-right .icon { color: var(--faint); }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---- Recurring rollup tag ---- */
+.rollup-tag { font-size: 10px; text-transform: uppercase; letter-spacing: .03em; color: var(--faint); font-weight: 600; margin-left: 8px; }
+
+/* ---- Bottom-bar central “+” FAB ---- */
+.fab-slot { position: relative; }
+.fab {
+  position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%);
+  width: 54px; height: 54px; border-radius: 50%; border: none;
+  background: var(--brand-grad); color: #fff;
+  display: grid; place-items: center;
+  box-shadow: 0 8px 20px rgba(21, 156, 106, 0.45);
+  transition: transform .08s;
+}
+.fab:active { transform: translateX(-50%) scale(0.93); }
+
+/* ---- Quick-add action sheet ---- */
+.quick-menu { display: flex; flex-direction: column; gap: 6px; }
+.quick-item {
+  display: flex; align-items: center; gap: 13px; width: 100%; text-align: left;
+  padding: 12px; border-radius: var(--radius-sm); background: var(--bg-2); border: 1px solid var(--border);
+  color: var(--text); transition: background .15s, border-color .15s;
+}
+.quick-item:hover { background: var(--surface-2); border-color: var(--border-2); }
+.quick-ic { display: inline-flex; padding: 9px; border-radius: 11px; background: var(--brand-soft); color: var(--brand-text); flex-shrink: 0; }
+.quick-label { font-weight: 600; font-size: 0.92rem; }
+.quick-desc { font-size: 12px; color: var(--faint); }
 
 /* ---- Responsive ---- */
 @media (max-width: 860px) {

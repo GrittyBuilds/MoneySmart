@@ -80,6 +80,20 @@ App.pages.dashboard = (function () {
       recent.length === 0
         ? ui.empty({ title: 'No transactions yet', description: 'Add your first transaction to see it here.' })
         : el('div', { class: 'list' }, recent.map((t) => {
+            if (t.kind === 'transfer') {
+              const from = t.account_id ? accts.get(t.account_id) : null
+              const to = t.transfer_account_id ? accts.get(t.transfer_account_id) : null
+              return el('div', { class: 'row' }, [
+                el('div', { class: 'row-main' }, [
+                  el('span', { class: 'avatar', style: { background: 'var(--surface-2)', color: 'var(--muted)' } }, [ui.icon('tx', 18)]),
+                  el('div', { style: { minWidth: 0 } }, [
+                    el('div', { class: 'row-title', text: t.description || 'Transfer' }),
+                    el('div', { class: 'row-sub', text: shortDate(t.occurred_on) + ` · ${(from && from.name) || '—'} → ${(to && to.name) || '—'}` }),
+                  ]),
+                ]),
+                el('span', { class: 'amount', text: money(t.amount) }),
+              ])
+            }
             const c = t.category_id ? cats.get(t.category_id) : null
             const a = t.account_id ? accts.get(t.account_id) : null
             return el('div', { class: 'row' }, [
@@ -99,7 +113,7 @@ App.pages.dashboard = (function () {
       ui.pageHeader("Dashboard", "Your family's money at a glance.",
         ui.monthPicker(month, (m) => { month = m; App.rerender() })),
       el('div', { class: 'stat-grid' }, [
-        ui.statCard({ label: 'Total balance', value: money(balance), hint: 'All accounts', tone: balance >= 0 ? '' : 'neg' }),
+        ui.statCard({ label: 'Net worth', value: money(balance), hint: 'Assets − debts', tone: balance >= 0 ? '' : 'neg' }),
         ui.statCard({ label: 'Income', value: money(totals.income), hint: monthLabel(month).split(' ')[0], tone: 'pos' }),
         ui.statCard({ label: 'Expenses', value: money(totals.expense), hint: monthLabel(month).split(' ')[0], tone: 'neg' }),
         ui.statCard({ label: 'Net', value: money(totals.net), hint: 'Income − expenses', tone: totals.net >= 0 ? 'pos' : 'neg' }),

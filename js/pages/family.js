@@ -3,6 +3,7 @@
  * ========================================================================== */
 window.App = window.App || {}
 App.pages = App.pages || {}
+App.actions = App.actions || {}
 
 App.pages.family = (function () {
   const SWATCHES = ['#10b981','#22c55e','#3b82f6','#6366f1','#8b5cf6','#ec4899','#f43f5e','#ef4444','#f59e0b','#eab308','#14b8a6','#06b6d4','#84cc16','#64748b']
@@ -267,6 +268,10 @@ App.pages.family = (function () {
     ])
     const m = ui.modal({ title: presetParent ? 'New subcategory' : 'New category', body: form })
   }
+
+  // Quick-add hooks used by the bottom-bar “+” menu.
+  App.actions.addCategory = () => openCat(null)
+  App.actions.addTag = () => openTag()
 
   return render
 })()

@@ -53,9 +53,48 @@ const NAV = [
   { path: '/family', label: 'Family', icon: 'users' },
   { path: '/settings', label: 'Settings', icon: 'settings' },
 ]
-// Mobile bottom bar shows the five core destinations; Family + Settings live
-// in the mobile top bar and the desktop sidebar.
-const BOTTOM = NAV.slice(0, 5)
+// Mobile bottom bar shows four core destinations with a central “+” button;
+// Reports, Family + Settings live in the mobile top bar and the desktop sidebar.
+const BOTTOM = [NAV[0], NAV[1], NAV[2], NAV[4]] // Dashboard, Transactions, Budgets, Accounts
+
+/* -------------------------------------------------------------------------- */
+/* Quick add — the central “+” action sheet                                    */
+/* -------------------------------------------------------------------------- */
+App.quickAdd = function () {
+  const { el } = App.util
+  const ui = App.ui
+  const item = (icon, label, desc, fn) =>
+    el('button', { type: 'button', class: 'quick-item', onClick: () => { ui.closeModal(); fn() } }, [
+      el('span', { class: 'quick-ic' }, [ui.icon(icon, 20)]),
+      el('div', { style: { minWidth: 0 } }, [
+        el('div', { class: 'quick-label', text: label }),
+        el('div', { class: 'quick-desc', text: desc }),
+      ]),
+    ])
+  const A = App.actions || {}
+  const body = el('div', { class: 'quick-menu' }, [
+    item('plus', 'Add transaction', 'Record income or an expense', () => A.addTransaction && A.addTransaction()),
+    item('tx', 'Transfer / pay', 'Move money or pay off a card', () => A.addTransfer && A.addTransfer()),
+    item('wallet', 'Add account', 'Checking, savings, credit card…', () => A.addAccount && A.addAccount()),
+    item('budget', 'Add category', 'A new spending or income group', () => A.addCategory && A.addCategory()),
+    item('tag', 'Add tag', 'A freeform label for transactions', () => A.addTag && A.addTag()),
+  ])
+  ui.modal({ title: 'Add', body })
+}
+
+function bottomBar() {
+  const { el } = App.util
+  const link = (it) =>
+    el('a', { href: '#' + it.path, dataset: { route: it.path } }, [App.ui.icon(it.icon, 22), el('span', { text: it.label })])
+  const fab = el('button', { class: 'fab', 'aria-label': 'Add', onClick: () => App.quickAdd() }, [App.ui.icon('plus', 26)])
+  return el('nav', { class: 'bottom-nav' }, [
+    link(BOTTOM[0]),
+    link(BOTTOM[1]),
+    el('div', { class: 'fab-slot' }, [fab]),
+    link(BOTTOM[2]),
+    link(BOTTOM[3]),
+  ])
+}
 
 const root = () => App.util.$('#app')
 
@@ -292,9 +331,12 @@ function sideFoot() {
 function renderShell() {
   const { el } = App.util
 
+  const addBtn = el('button', { class: 'btn primary block', onClick: () => App.quickAdd() }, [App.ui.icon('plus', 18), 'Add'])
+
   const sidebar = el('aside', { class: 'sidebar' }, [
     brand(),
     householdSwitcher(),
+    addBtn,
     navLinks(NAV, 'nav'),
     sideFoot(),
   ])
@@ -306,6 +348,7 @@ function renderShell() {
     App.config.hasPin()
       ? el('button', { class: 'icon-btn', 'aria-label': 'Lock now', onClick: () => App.lockNow() }, [App.ui.icon('lock', 20)])
       : null,
+    el('a', { href: '#/reports', class: 'icon-btn', 'aria-label': 'Reports' }, [App.ui.icon('report', 20)]),
     el('a', { href: '#/family', class: 'icon-btn', 'aria-label': 'Family' }, [App.ui.icon('users', 20)]),
     el('a', { href: '#/settings', class: 'icon-btn', 'aria-label': 'Settings' }, [App.ui.icon('settings', 20)]),
     App.state.mode === 'cloud'
@@ -324,7 +367,7 @@ function renderShell() {
   const shell = el('div', { class: 'app-shell' }, [
     sidebar,
     main,
-    navLinks(BOTTOM, 'bottom-nav'),
+    bottomBar(),
   ])
 
   App.util.clear(root()).appendChild(shell)
