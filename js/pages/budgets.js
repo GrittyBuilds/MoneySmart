@@ -38,17 +38,30 @@ App.pages.budgets = (function () {
     const budgetMap = new Map(budgets.map((b) => [b.category_id, b.amount]))
     const cats = s.expenseCategories()
 
-    // Keep parent → subcategory order so the hierarchy reads top to bottom.
-    const rows = s.orderedCategories('expense').map(({ cat, depth }) => ({
-      cat,
-      depth,
-      budget: budgetMap.get(cat.id) || 0,
-      spent: spend.get(cat.id) || 0,
-    }))
-
+    // Build rows in parent → subcategory order. A subcategory's budget and
+    // spending roll up into its parent, so the parent row reflects the whole
+    // group while each child row shows just its own numbers.
+    const rows = []
     let budgeted = 0
     let spent = 0
-    rows.forEach((r) => { budgeted += r.budget; if (r.budget > 0) spent += r.spent })
+    for (const parent of s.topCategories('expense')) {
+      const kids = s.childrenOf(parent.id)
+      const ownBudget = budgetMap.get(parent.id) || 0
+      const ownSpent = spend.get(parent.id) || 0
+      let effBudget = ownBudget
+      let effSpent = ownSpent
+      const kidRows = kids.map((k) => {
+        const kb = budgetMap.get(k.id) || 0
+        const ks = spend.get(k.id) || 0
+        effBudget += kb
+        effSpent += ks
+        return { cat: k, depth: 1, budget: kb, spent: ks, ownBudget: kb, rolledUp: false }
+      })
+      rows.push({ cat: parent, depth: 0, budget: effBudget, spent: effSpent, ownBudget, rolledUp: kids.length > 0 })
+      kidRows.forEach((r) => rows.push(r))
+      budgeted += effBudget
+      if (effBudget > 0) spent += effSpent
+    }
     const remaining = budgeted - spent
 
     ui.clear(body)
@@ -68,7 +81,7 @@ App.pages.budgets = (function () {
     const list = el('div', { class: 'stack', style: { marginTop: '16px' } }, rows.map((r) => budgetRow(r)))
     body.appendChild(list)
 
-    function budgetRow({ cat, depth, budget, spent }) {
+    function budgetRow({ cat, depth, budget, spent, ownBudget, rolledUp }) {
       const has = budget > 0
       const pct = has ? Math.min(100, (spent / budget) * 100) : 0
       const over = has && spent > budget
@@ -80,10 +93,11 @@ App.pages.budgets = (function () {
             depth ? el('span', { class: 'cat-branch', text: '↳' }) : null,
             el('span', { class: 'dot', style: { background: cat.color } }),
             cat.name,
+            rolledUp ? el('span', { class: 'rollup-tag', text: 'incl. subcategories' }) : null,
           ]),
           el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
             el('span', { class: 'budget-nums', html: money(spent) + (has ? ` <span class="of">/ ${money(budget)}</span>` : '') }),
-            el('button', { class: 'icon-btn', 'aria-label': 'Set budget', onClick: () => openBudget(cat, budget) }, [ui.icon('edit', 16)]),
+            el('button', { class: 'icon-btn', 'aria-label': 'Set budget', onClick: () => openBudget(cat, ownBudget) }, [ui.icon('edit', 16)]),
           ]),
         ]),
         has

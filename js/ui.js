@@ -226,6 +226,91 @@ App.ui = (function () {
     ])
   }
 
+  /**
+   * Searchable category combobox. Start typing to filter categories (and their
+   * subcategories); click or press Enter to pick. Returns { wrap, getValue,
+   * setValue, setKind, input }.
+   */
+  function categoryPicker({ kind = 'expense', selectedId = '', placeholder = 'Search category…', onChange } = {}) {
+    const s = App.store
+    let value = selectedId || ''
+    let currentKind = kind
+    let active = -1
+
+    const input = el('input', { class: 'input', type: 'text', placeholder, autocomplete: 'off', role: 'combobox' })
+    const list = el('div', { class: 'combo-list', style: { display: 'none' } })
+    const wrap = el('div', { class: 'combo' }, [input, list])
+
+    const labelFor = (id) => (id ? (s.categoryMap().get(id) || {}).name || '' : '')
+    const setDisplay = () => { input.value = labelFor(value) }
+    setDisplay()
+
+    function options() {
+      return [{ id: '', name: 'Uncategorized', depth: 0, color: null }].concat(
+        s.orderedCategories(currentKind).map(({ cat, depth }) => ({ id: cat.id, name: cat.name, depth, color: cat.color })),
+      )
+    }
+
+    let current = []
+    function renderList(filter) {
+      const q = (filter || '').trim().toLowerCase()
+      current = options().filter((o) => !q || o.name.toLowerCase().includes(q))
+      active = current.findIndex((o) => o.id === value)
+      clear(list)
+      if (current.length === 0) {
+        list.appendChild(el('div', { class: 'combo-empty', text: 'No matching category' }))
+      } else {
+        current.forEach((o, i) => {
+          const item = el('div', { class: 'combo-item' + (o.id === value ? ' sel' : '') + (i === active ? ' active' : ''), dataset: { i: String(i) } }, [
+            el('span', { class: 'dot', style: { background: o.color || 'transparent', marginLeft: o.depth ? '14px' : '0' } }),
+            el('span', { class: 'combo-name' + (o.depth ? ' sub' : ''), text: o.name }),
+          ])
+          item.addEventListener('mousedown', (e) => { e.preventDefault(); choose(i) })
+          list.appendChild(item)
+        })
+      }
+      list.style.display = 'block'
+    }
+    const close = () => { list.style.display = 'none' }
+    function choose(i) {
+      const o = current[i]
+      if (!o) return
+      value = o.id
+      setDisplay()
+      close()
+      if (onChange) onChange(value)
+    }
+    function highlight(next) {
+      if (list.style.display === 'none') { renderList(input.value); return }
+      if (!current.length) return
+      active = (next + current.length) % current.length
+      Array.from(list.children).forEach((c, i) => c.classList.toggle('active', i === active))
+      const node = list.children[active]
+      if (node && node.scrollIntoView) node.scrollIntoView({ block: 'nearest' })
+    }
+
+    input.addEventListener('focus', () => { input.select(); renderList('') })
+    input.addEventListener('input', () => renderList(input.value))
+    input.addEventListener('blur', () => setTimeout(() => { setDisplay(); close() }, 130))
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); highlight(active + 1) }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(active - 1) }
+      else if (e.key === 'Enter') { if (list.style.display !== 'none') { e.preventDefault(); choose(active >= 0 ? active : 0) } }
+      else if (e.key === 'Escape') {
+        // Close only the dropdown, not the surrounding modal.
+        if (list.style.display !== 'none') { e.stopPropagation(); close() }
+      }
+    })
+
+    return {
+      wrap,
+      getValue: () => value,
+      setValue: (id) => { value = id || ''; setDisplay() },
+      setKind: (k) => { currentKind = k; value = ''; setDisplay() },
+      input,
+    }
+  }
+
   // Coloured square badge showing a category's initials.
   function catBadge(cat, size = 40) {
     const color = (cat && cat.color) || '#64748b'
@@ -238,6 +323,6 @@ App.ui = (function () {
 
   return {
     icon, logoMark, wordmark, modal, closeModal, confirm, toast, spinner, empty, pageHeader, clear,
-    moneyField, statCard, monthPicker, catBadge,
+    moneyField, statCard, monthPicker, catBadge, categoryPicker,
   }
 })()

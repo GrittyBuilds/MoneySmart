@@ -68,7 +68,9 @@ App.pages.reports = (function () {
     return true
   }
   const periodTx = () => App.store.data.transactions.filter(inRange)
-  const filteredTx = () => periodTx().filter((t) => kind === 'all' || t.kind === kind)
+  // Reports cover income vs. expense; transfers move money between accounts and
+  // are excluded from the analytical breakdowns and totals.
+  const filteredTx = () => periodTx().filter((t) => t.kind !== 'transfer' && (kind === 'all' || t.kind === kind))
 
   function periodLabel() {
     const { from, to } = range()
@@ -151,6 +153,7 @@ App.pages.reports = (function () {
   function cashflowMonths() {
     const map = new Map()
     for (const t of periodTx()) {
+      if (t.kind === 'transfer') continue
       const key = t.occurred_on.slice(0, 7)
       const e = map.get(key) || { key, label: App.util.monthLabel(App.util.parseISO(t.occurred_on)), inflow: 0, outflow: 0 }
       if (t.kind === 'income') e.inflow += t.amount

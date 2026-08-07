@@ -9,19 +9,33 @@ App.LocalBackend = (function () {
   const { uid, inviteCode, round2, monthKey } = App.util
   const KEY = 'moneysmart.data'
 
-  const DEFAULT_CATEGORIES = [
-    { name: 'Groceries', kind: 'expense', color: '#22c55e' },
-    { name: 'Rent/Mortgage', kind: 'expense', color: '#3b82f6' },
-    { name: 'Utilities', kind: 'expense', color: '#f59e0b' },
-    { name: 'Transport', kind: 'expense', color: '#8b5cf6' },
-    { name: 'Dining Out', kind: 'expense', color: '#ef4444' },
-    { name: 'Entertainment', kind: 'expense', color: '#ec4899' },
-    { name: 'Health', kind: 'expense', color: '#14b8a6' },
-    { name: 'Kids', kind: 'expense', color: '#f97316' },
-    { name: 'Savings', kind: 'expense', color: '#06b6d4' },
-    { name: 'Salary', kind: 'income', color: '#159C6A' },
-    { name: 'Other Income', kind: 'income', color: '#84cc16' },
+  // Sample category tree: a handful of well-organised top-level ("top shelf")
+  // categories, each with a few starter subcategories.
+  const DEFAULT_CATEGORY_TREE = [
+    { name: 'Housing', kind: 'expense', color: '#3b82f6', children: ['Rent/Mortgage', 'Utilities', 'Internet & Phone', 'Maintenance'] },
+    { name: 'Food', kind: 'expense', color: '#22c55e', children: ['Groceries', 'Dining Out', 'Coffee & Snacks'] },
+    { name: 'Transportation', kind: 'expense', color: '#8b5cf6', children: ['Gas & Fuel', 'Car Payment', 'Public Transit', 'Parking'] },
+    { name: 'Health', kind: 'expense', color: '#14b8a6', children: ['Medical', 'Pharmacy', 'Fitness'] },
+    { name: 'Shopping', kind: 'expense', color: '#f59e0b', children: ['Household', 'Clothing', 'Gifts'] },
+    { name: 'Entertainment', kind: 'expense', color: '#ec4899', children: ['Streaming', 'Events', 'Hobbies'] },
+    { name: 'Kids', kind: 'expense', color: '#f97316', children: ['Childcare', 'School', 'Activities'] },
+    { name: 'Personal Care', kind: 'expense', color: '#6366f1', children: ['Subscriptions', 'Grooming', 'Pets'] },
+    { name: 'Savings & Debt', kind: 'expense', color: '#06b6d4', children: ['Emergency Fund', 'Investments', 'Debt Payment'] },
+    { name: 'Income', kind: 'income', color: '#159C6A', children: ['Salary', 'Bonus', 'Interest'] },
+    { name: 'Other Income', kind: 'income', color: '#84cc16', children: [] },
   ]
+
+  function seedCategories(hid) {
+    const rows = []
+    for (const parent of DEFAULT_CATEGORY_TREE) {
+      const pid = uid()
+      rows.push({ id: pid, household_id: hid, name: parent.name, kind: parent.kind, color: parent.color, parent_id: null })
+      for (const childName of parent.children || []) {
+        rows.push({ id: uid(), household_id: hid, name: childName, kind: parent.kind, color: parent.color, parent_id: pid })
+      }
+    }
+    return rows
+  }
 
   function seed() {
     const hid = uid()
@@ -29,16 +43,11 @@ App.LocalBackend = (function () {
       household: { id: hid, name: 'My Household', invite_code: inviteCode() },
       members: [{ id: uid(), user_id: 'local', display_name: 'Me', role: 'owner' }],
       accounts: [],
-      categories: DEFAULT_CATEGORIES.map((c) => ({
-        id: uid(),
-        household_id: hid,
-        name: c.name,
-        kind: c.kind,
-        color: c.color,
-      })),
+      categories: seedCategories(hid),
       tags: [],
       transactions: [],
       budgets: [],
+      recurring: [],
     }
   }
 
@@ -55,6 +64,7 @@ App.LocalBackend = (function () {
     }
     // Backfill collections added in later versions.
     if (!data.tags) data.tags = []
+    if (!data.recurring) data.recurring = []
     return data
   }
 
@@ -71,6 +81,35 @@ App.LocalBackend = (function () {
     return splits
       .map((s) => ({ category_id: s.category_id || null, amount: round2(s.amount) }))
       .filter((s) => s.amount > 0)
+  }
+
+  // Strip a recurring rule's template down to the fields used to spawn a tx.
+  function sanitizeTemplate(t) {
+    t = t || {}
+    return {
+      kind: t.kind || 'expense',
+      amount: round2(t.amount),
+      account_id: t.account_id || null,
+      transfer_account_id: t.transfer_account_id || null,
+      category_id: t.category_id || null,
+      description: t.description || null,
+      vendor: t.vendor || null,
+      tag_ids: Array.isArray(t.tag_ids) ? t.tag_ids.slice() : [],
+      splits: normalizeSplits(t.splits),
+    }
+  }
+
+  // Advance a YYYY-MM-DD date by one step of the given frequency.
+  function advanceDate(iso, frequency) {
+    const d = App.util.parseISO(iso)
+    switch (frequency) {
+      case 'weekly': d.setDate(d.getDate() + 7); break
+      case 'biweekly': d.setDate(d.getDate() + 14); break
+      case 'yearly': d.setFullYear(d.getFullYear() + 1); break
+      case 'monthly':
+      default: d.setMonth(d.getMonth() + 1); break
+    }
+    return App.util.toISO(d)
   }
 
   return {
@@ -128,6 +167,7 @@ App.LocalBackend = (function () {
       // Keep transactions but unlink them (mirrors ON DELETE SET NULL).
       d.transactions.forEach((t) => {
         if (t.account_id === id) t.account_id = null
+        if (t.transfer_account_id === id) t.transfer_account_id = null
       })
       save(d)
       return ok()
@@ -210,13 +250,14 @@ App.LocalBackend = (function () {
         id: uid(),
         household_id: d.household.id,
         account_id: input.account_id || null,
-        category_id: input.category_id || null,
+        transfer_account_id: input.transfer_account_id || null,
+        category_id: input.kind === 'transfer' ? null : input.category_id || null,
         kind: input.kind,
         amount: round2(input.amount),
         description: input.description || null,
         vendor: input.vendor || null,
         tag_ids: Array.isArray(input.tag_ids) ? input.tag_ids.slice() : [],
-        splits: normalizeSplits(input.splits),
+        splits: input.kind === 'transfer' ? [] : normalizeSplits(input.splits),
         occurred_on: input.occurred_on,
         created_by: 'local',
         created_at: new Date().toISOString(),
@@ -273,6 +314,79 @@ App.LocalBackend = (function () {
       return ok()
     },
 
+    /* ---- Recurring transactions ---- */
+    async listRecurring() {
+      return ok(load().recurring.slice())
+    },
+    async addRecurring(input) {
+      const d = load()
+      const row = {
+        id: uid(),
+        household_id: d.household.id,
+        template: sanitizeTemplate(input.template),
+        frequency: input.frequency || 'monthly',
+        next_on: input.next_on,
+        end_on: input.end_on || null,
+        active: input.active !== false,
+        created_at: new Date().toISOString(),
+      }
+      d.recurring.push(row)
+      save(d)
+      return ok(row)
+    },
+    async updateRecurring(id, patch) {
+      const d = load()
+      const r = d.recurring.find((x) => x.id === id)
+      if (r) {
+        Object.assign(r, patch)
+        if (patch.template) r.template = sanitizeTemplate(patch.template)
+      }
+      save(d)
+      return ok(r)
+    },
+    async deleteRecurring(id) {
+      const d = load()
+      d.recurring = d.recurring.filter((x) => x.id !== id)
+      save(d)
+      return ok()
+    },
+    /** Create any transactions whose recurring rules have come due (up to today). */
+    async runDueRecurring() {
+      const d = load()
+      const today = App.util.todayISO()
+      let created = 0
+      for (const r of d.recurring) {
+        if (!r.active || !r.next_on) continue
+        let guard = 0
+        while (r.next_on <= today && (!r.end_on || r.next_on <= r.end_on) && guard < 500) {
+          const tpl = r.template || {}
+          d.transactions.push({
+            id: uid(),
+            household_id: d.household.id,
+            account_id: tpl.account_id || null,
+            transfer_account_id: tpl.transfer_account_id || null,
+            category_id: tpl.kind === 'transfer' ? null : tpl.category_id || null,
+            kind: tpl.kind,
+            amount: round2(tpl.amount),
+            description: tpl.description || null,
+            vendor: tpl.vendor || null,
+            tag_ids: Array.isArray(tpl.tag_ids) ? tpl.tag_ids.slice() : [],
+            splits: tpl.kind === 'transfer' ? [] : normalizeSplits(tpl.splits),
+            occurred_on: r.next_on,
+            recurring_id: r.id,
+            created_by: 'local',
+            created_at: new Date().toISOString(),
+          })
+          created++
+          r.next_on = advanceDate(r.next_on, r.frequency)
+          guard++
+        }
+        if (r.end_on && r.next_on > r.end_on) r.active = false
+      }
+      if (created) save(d)
+      return ok(created)
+    },
+
     /* Export the raw store — used to migrate local data into the cloud. */
     _dump() {
       return load()
@@ -291,6 +405,7 @@ App.LocalBackend = (function () {
         accounts: d.accounts,
         transactions: d.transactions,
         budgets: d.budgets,
+        recurring: d.recurring,
       }
     },
 
@@ -311,6 +426,7 @@ App.LocalBackend = (function () {
         accounts: backup.accounts || [],
         transactions: backup.transactions || [],
         budgets: backup.budgets || [],
+        recurring: backup.recurring || [],
       }
       // Keep every row pointed at this household for internal consistency.
       next.categories.forEach((c) => (c.household_id = hid))
@@ -318,6 +434,7 @@ App.LocalBackend = (function () {
       next.accounts.forEach((a) => (a.household_id = hid))
       next.transactions.forEach((t) => (t.household_id = hid))
       next.budgets.forEach((b) => (b.household_id = hid))
+      next.recurring.forEach((r) => (r.household_id = hid))
       save(next)
       return ok()
     },

@@ -75,8 +75,10 @@ create table if not exists public.transactions (
   id           uuid primary key default gen_random_uuid(),
   household_id uuid not null references public.households (id) on delete cascade,
   account_id   uuid references public.accounts (id) on delete set null,
+  -- For a transfer, the destination account (account_id is the source).
+  transfer_account_id uuid references public.accounts (id) on delete set null,
   category_id  uuid references public.categories (id) on delete set null,
-  kind         text not null default 'expense',   -- expense | income
+  kind         text not null default 'expense',   -- expense | income | transfer
   amount       numeric(14,2) not null check (amount >= 0),
   description  text,
   vendor       text,
@@ -91,10 +93,29 @@ create table if not exists public.transactions (
   created_at   timestamptz not null default now()
 );
 
--- Migrations for projects created before vendor / tags / splits existed.
+-- Migrations for projects created before vendor / tags / splits / transfers existed.
 alter table public.transactions add column if not exists vendor  text;
 alter table public.transactions add column if not exists tag_ids uuid[] not null default '{}';
 alter table public.transactions add column if not exists splits  jsonb  not null default '[]';
+alter table public.transactions add column if not exists transfer_account_id uuid references public.accounts (id) on delete set null;
+
+-- A recurring rule that spawns transactions on a schedule. `template` is a
+-- transaction shape ({ kind, amount, account_id, transfer_account_id,
+-- category_id, description, vendor, tag_ids, splits }); `next_on` is the next
+-- date due.
+create table if not exists public.recurring (
+  id           uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households (id) on delete cascade,
+  template     jsonb not null default '{}',
+  frequency    text not null default 'monthly',   -- weekly | biweekly | monthly | yearly
+  next_on      date not null,
+  end_on       date,
+  active       boolean not null default true,
+  created_at   timestamptz not null default now()
+);
+
+-- Link a spawned transaction back to the rule that created it.
+alter table public.transactions add column if not exists recurring_id uuid references public.recurring (id) on delete set null;
 
 -- A monthly spending limit for a category. `month` is the first day of the month.
 create table if not exists public.budgets (
@@ -115,6 +136,7 @@ create index if not exists idx_categories_house    on public.categories (househo
 create index if not exists idx_tags_house          on public.tags (household_id);
 create index if not exists idx_tx_household_date   on public.transactions (household_id, occurred_on);
 create index if not exists idx_budgets_house_month on public.budgets (household_id, month);
+create index if not exists idx_recurring_house     on public.recurring (household_id, next_on);
 
 -- ----------------------------------------------------------------------------
 -- Membership helper (SECURITY DEFINER avoids RLS recursion on household_members)
@@ -142,6 +164,7 @@ alter table public.categories        enable row level security;
 alter table public.tags              enable row level security;
 alter table public.transactions      enable row level security;
 alter table public.budgets           enable row level security;
+alter table public.recurring         enable row level security;
 
 -- households: members can read their households; anyone signed in can create one.
 drop policy if exists households_select on public.households;
@@ -178,7 +201,7 @@ create policy members_delete on public.household_members
 do $$
 declare t text;
 begin
-  foreach t in array array['accounts', 'categories', 'tags', 'transactions', 'budgets']
+  foreach t in array array['accounts', 'categories', 'tags', 'transactions', 'budgets', 'recurring']
   loop
     execute format('drop policy if exists %1$s_all on public.%1$s;', t);
     execute format(
@@ -201,6 +224,16 @@ set search_path = public
 as $$
 declare
   hid uuid;
+  p_housing   uuid;
+  p_food      uuid;
+  p_transport uuid;
+  p_health    uuid;
+  p_shopping  uuid;
+  p_ent       uuid;
+  p_kids      uuid;
+  p_personal  uuid;
+  p_savings   uuid;
+  p_income    uuid;
 begin
   insert into public.households (name, created_by)
   values (household_name, auth.uid())
@@ -209,18 +242,53 @@ begin
   insert into public.household_members (household_id, user_id, display_name, role)
   values (hid, auth.uid(), coalesce(nullif(member_name, ''), 'Me'), 'owner');
 
-  insert into public.categories (household_id, name, kind, color, icon) values
-    (hid, 'Groceries',      'expense', '#22c55e', 'shopping-cart'),
-    (hid, 'Rent/Mortgage',  'expense', '#3b82f6', 'home'),
-    (hid, 'Utilities',      'expense', '#f59e0b', 'zap'),
-    (hid, 'Transport',      'expense', '#8b5cf6', 'car'),
-    (hid, 'Dining Out',     'expense', '#ef4444', 'utensils'),
-    (hid, 'Entertainment',  'expense', '#ec4899', 'tv'),
-    (hid, 'Health',         'expense', '#14b8a6', 'heart-pulse'),
-    (hid, 'Kids',           'expense', '#f97316', 'baby'),
-    (hid, 'Savings',        'expense', '#06b6d4', 'piggy-bank'),
-    (hid, 'Salary',         'income',  '#159C6A', 'wallet'),
-    (hid, 'Other Income',   'income',  '#84cc16', 'plus');
+  -- Top-level ("top shelf") categories, each returning its id so we can hang
+  -- a few starter subcategories underneath.
+  insert into public.categories (household_id, name, kind, color, icon) values (hid, 'Housing',        'expense', '#3b82f6', 'home')     returning id into p_housing;
+  insert into public.categories (household_id, name, kind, color, icon) values (hid, 'Food',           'expense', '#22c55e', 'shopping-cart') returning id into p_food;
+  insert into public.categories (household_id, name, kind, color, icon) values (hid, 'Transportation', 'expense', '#8b5cf6', 'car')      returning id into p_transport;
+  insert into public.categories (household_id, name, kind, color, icon) values (hid, 'Health',         'expense', '#14b8a6', 'heart-pulse') returning id into p_health;
+  insert into public.categories (household_id, name, kind, color, icon) values (hid, 'Shopping',       'expense', '#f59e0b', 'tag')      returning id into p_shopping;
+  insert into public.categories (household_id, name, kind, color, icon) values (hid, 'Entertainment',  'expense', '#ec4899', 'tv')       returning id into p_ent;
+  insert into public.categories (household_id, name, kind, color, icon) values (hid, 'Kids',           'expense', '#f97316', 'baby')     returning id into p_kids;
+  insert into public.categories (household_id, name, kind, color, icon) values (hid, 'Personal Care',  'expense', '#6366f1', 'user')     returning id into p_personal;
+  insert into public.categories (household_id, name, kind, color, icon) values (hid, 'Savings & Debt', 'expense', '#06b6d4', 'piggy-bank') returning id into p_savings;
+  insert into public.categories (household_id, name, kind, color, icon) values (hid, 'Income',         'income',  '#159C6A', 'wallet')   returning id into p_income;
+  insert into public.categories (household_id, name, kind, color, icon) values (hid, 'Other Income',   'income',  '#84cc16', 'plus');
+
+  insert into public.categories (household_id, name, kind, color, icon, parent_id) values
+    (hid, 'Rent/Mortgage',   'expense', '#3b82f6', 'home', p_housing),
+    (hid, 'Utilities',       'expense', '#3b82f6', 'zap', p_housing),
+    (hid, 'Internet & Phone','expense', '#3b82f6', 'tag', p_housing),
+    (hid, 'Maintenance',     'expense', '#3b82f6', 'tag', p_housing),
+    (hid, 'Groceries',       'expense', '#22c55e', 'shopping-cart', p_food),
+    (hid, 'Dining Out',      'expense', '#22c55e', 'utensils', p_food),
+    (hid, 'Coffee & Snacks', 'expense', '#22c55e', 'tag', p_food),
+    (hid, 'Gas & Fuel',      'expense', '#8b5cf6', 'car', p_transport),
+    (hid, 'Car Payment',     'expense', '#8b5cf6', 'car', p_transport),
+    (hid, 'Public Transit',  'expense', '#8b5cf6', 'tag', p_transport),
+    (hid, 'Parking',         'expense', '#8b5cf6', 'tag', p_transport),
+    (hid, 'Medical',         'expense', '#14b8a6', 'heart-pulse', p_health),
+    (hid, 'Pharmacy',        'expense', '#14b8a6', 'tag', p_health),
+    (hid, 'Fitness',         'expense', '#14b8a6', 'tag', p_health),
+    (hid, 'Household',       'expense', '#f59e0b', 'tag', p_shopping),
+    (hid, 'Clothing',        'expense', '#f59e0b', 'tag', p_shopping),
+    (hid, 'Gifts',           'expense', '#f59e0b', 'tag', p_shopping),
+    (hid, 'Streaming',       'expense', '#ec4899', 'tv', p_ent),
+    (hid, 'Events',          'expense', '#ec4899', 'tag', p_ent),
+    (hid, 'Hobbies',         'expense', '#ec4899', 'tag', p_ent),
+    (hid, 'Childcare',       'expense', '#f97316', 'baby', p_kids),
+    (hid, 'School',          'expense', '#f97316', 'tag', p_kids),
+    (hid, 'Activities',      'expense', '#f97316', 'tag', p_kids),
+    (hid, 'Subscriptions',   'expense', '#6366f1', 'tag', p_personal),
+    (hid, 'Grooming',        'expense', '#6366f1', 'tag', p_personal),
+    (hid, 'Pets',            'expense', '#6366f1', 'tag', p_personal),
+    (hid, 'Emergency Fund',  'expense', '#06b6d4', 'piggy-bank', p_savings),
+    (hid, 'Investments',     'expense', '#06b6d4', 'tag', p_savings),
+    (hid, 'Debt Payment',    'expense', '#06b6d4', 'tag', p_savings),
+    (hid, 'Salary',          'income',  '#159C6A', 'wallet', p_income),
+    (hid, 'Bonus',           'income',  '#159C6A', 'tag', p_income),
+    (hid, 'Interest',        'income',  '#159C6A', 'tag', p_income);
 
   return hid;
 end;
